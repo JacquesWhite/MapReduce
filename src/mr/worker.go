@@ -1,9 +1,17 @@
 package mr
 
 import (
-	"fmt"
-	"os"
-	"sort"
+	"context"
+	//"fmt"
+	"math/rand"
+	"net"
+	//"os"
+	//"sort"
+	"strconv"
+
+	pbmaster "github.com/JacquesWhite/MapReduce/proto/master"
+	pbworker "github.com/JacquesWhite/MapReduce/proto/worker"
+	"google.golang.org/grpc"
 )
 
 type WorkerContext struct {
@@ -13,57 +21,83 @@ type WorkerContext struct {
 	ReduceFunc func(string, []string) string
 }
 
-func WorkerMain(context WorkerContext) {
+type WorkerServer struct {
+	pbworker.UnimplementedWorkerServer
+}
 
-	var intermediate []KeyValue
-	content, err := os.ReadFile("../datasets/test.txt")
+// Send message to Master with Worker address for further communication.
+func sendRegisterRequest(ip string, port string, mp string) {
+	conn, err := grpc.Dial(ip+":"+port, grpc.WithInsecure())
 	if err != nil {
 		return
 	}
 
-	kva := context.MapFunc("../datasets/test.txt", string(content))
-	intermediate = append(intermediate, kva...)
+	client := pbmaster.NewMasterClient(conn)
+	req := &pbmaster.RegisterWorkerRequest{
+		WorkerAddress: &pbmaster.WorkerAddress{
+			// Currently localhost, further may be passed as an argument
+			Ip: "127.0.0.1",
 
-	sort.Sort(ByKey(intermediate))
-
-	i := 0
-	for i < len(intermediate) {
-		j := i + 1
-		for j < len(intermediate) && intermediate[j].Key == intermediate[i].Key {
-			j++
-		}
-		var values []string
-		for k := i; k < j; k++ {
-			values = append(values, intermediate[k].Value)
-		}
-		output := context.ReduceFunc(intermediate[i].Key, values)
-		// this is the correct format for each line of Reduce output.
-		// please do not change it.
-		fmt.Println(intermediate[i].Key, output)
-		i = j
+			// Client port passed to Master
+			Port: mp,
+		},
 	}
+
+	_, err = client.RegisterWorker(context.Background(), req)
+	if err != nil {
+		return
+	}
+
+	if conn.Close() != nil {
+		return
+	}
+}
+
+func startWorkerServer(port string) {
+	listener, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		return
+	}
+
+	srv := grpc.NewServer()
+	pbworker.RegisterWorkerServer(srv, &WorkerServer{})
 
 	for {
-		x := 1 + 2
-		x = x - 1
-		// connect to master
-		// wait for messages
-		// handle the messages and do the work
-
-		// upon receiving a message from the master
-		// which will contain the file name
-		// open it and pass the contents to the Map function
-
-		// Worker receives the message MapRequest
-		// With file to Map and directory in which we want to create file with intermediate results
-		// todo 1.
-
-		// Worker receives the message ReduceRequest
-		// With file containing intermediate results and directory in which we want to create file with final results
-		// todo 2.
-
-		// Later Master can just iterate through all files and collect the results
-
-		//fmt.Println("Worker")
+		// Handle the messages and do the work
+		if srv.Serve(listener) != nil {
+			return
+		}
 	}
+}
+
+func WorkerMain(workerCtx WorkerContext) {
+
+	myPort := strconv.Itoa(rand.Intn(60000))
+	sendRegisterRequest(workerCtx.MasterIP, workerCtx.MasterPort, myPort)
+
+	startWorkerServer(myPort)
+}
+
+func (w WorkerServer) Map(ctx context.Context, request *pbworker.MapRequest) (*pbworker.MapResponse, error) {
+	//TODO implement me
+	panic("implement me")
+	// Worker receives the message MapRequest
+	// With file to Map and directory in which we want to create file with intermediate results
+
+	// upon receiving a message from the master
+	// which will contain the file name
+	// open it and pass the contents to the Map function
+}
+
+func (w WorkerServer) Reduce(ctx context.Context, request *pbworker.ReduceRequest) (*pbworker.ReduceResponse, error) {
+	//TODO implement me
+	panic("implement me")
+	// Worker receives the message ReduceRequest
+	// With file containing intermediate results and directory in which we want to create file with final results
+	// todo 2.
+}
+
+func (w WorkerServer) CheckStatus(ctx context.Context, request *pbworker.CheckStatusRequest) (*pbworker.CheckStatusResponse, error) {
+	//TODO implement me
+	panic("implement me")
 }

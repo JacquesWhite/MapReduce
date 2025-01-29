@@ -19,14 +19,14 @@ func main() {
 	}
 
 	mapFunc, reduceFunc := loadPlugin(os.Args[3])
-	context := mr.WorkerContext{
+	workerContext := mr.WorkerContext{
 		MasterIP:   os.Args[1],
 		MasterPort: os.Args[2],
 		MapFunc:    mapFunc,
 		ReduceFunc: reduceFunc,
 	}
 
-	mr.WorkerMain(context)
+	mr.WorkerMain(workerContext)
 }
 
 // Load the Map and Reduce functions for Worker for further use

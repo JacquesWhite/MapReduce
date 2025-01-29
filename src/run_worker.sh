@@ -11,10 +11,10 @@
 
 
 # Run Mock Master-Server
-PORT=$RANDOM
-(cd main && go build mock-master.go) || exit 1
-timeout -k 2s 180s ./main/mock-master $PORT ../datasets/test.txt
-sleep 1
+#PORT=$RANDOM
+#(cd main && go build mock-master.go) || exit 1
+#timeout -k 2s 180s ./main/mock-master $PORT ../datasets/test.txt
+#sleep 1
 
 # Run Worker
-timeout -k 2s 180s ./main/main-worker 127.0.0.1 $PORT plugins/worker-plugin.so
+timeout -k 2s 180s ./main/main-worker 127.0.0.1 12345 plugins/worker-plugin.so
