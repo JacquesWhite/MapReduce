@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package worker;
+
+service Worker {
+  rpc Map(MapRequest) returns (MapResponse);
+  rpc Reduce(ReduceRequest) returns (ReduceResponse);
+  rpc CheckStatus(CheckStatusRequest) returns (CheckStatusResponse);
+}
+
+message MapRequest {
+  string input_file = 1;
+  string intermediate_dir = 2;
+}
+
+message MapResponse {
+}
+
+message ReduceRequest {
+  string intermediate_file = 1;
+  string output_dir = 2;
+}
+
+message ReduceResponse {
+}
+
+message CheckStatusRequest {
+}
+
+message CheckStatusResponse {
+  enum Status {
+    IDLE = 0;
+    BUSY = 1;
+  }
+  Status status = 1;
+}

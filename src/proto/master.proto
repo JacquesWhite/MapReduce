@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package master;
+
+
+service Master {
+  rpc RegisterWorkers(RegisterWorkersRequest) returns (RegisterWorkersResponse);
+  rpc MapReduce(MapReduceRequest) returns (MapReduceResponse);
+}
+
+message WorkerAddress {
+  string ip = 1;
+  int32 port = 2;
+}
+
+message RegisterWorkersRequest {
+  repeated WorkerAddress workers = 1;
+}
+
+message RegisterWorkersResponse {
+}
+
+message MapReduceRequest {
+  string input_dir = 1;
+  string intermediate_dir = 2;
+}
+
+message MapReduceResponse {
+  string output_dir = 1;
+}
