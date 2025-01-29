@@ -12,14 +12,14 @@ service Worker {
 message MapRequest {
   string input_file = 1;
   string intermediate_dir = 2;
+  int32 num_partitions = 3;
 }
 
 message MapResponse {
 }
 
 message ReduceRequest {
-//  TODO
-  string intermediate_file = 1;
+  repeated string intermediate_file = 1;
   string output_dir = 2;
 }
 
