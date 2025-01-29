@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package worker;
+option go_package = "./proto/worker";
 
 service Worker {
   rpc Map(MapRequest) returns (MapResponse);
@@ -17,6 +18,7 @@ message MapResponse {
 }
 
 message ReduceRequest {
+//  TODO
   string intermediate_file = 1;
   string output_dir = 2;
 }
@@ -29,8 +31,9 @@ message CheckStatusRequest {
 
 message CheckStatusResponse {
   enum Status {
-    IDLE = 0;
-    BUSY = 1;
+    IDLE = 0; // Worker is ready to accept new tasks
+    BUSY = 1; // Worker is currently processing a task
+    COMPLETED = 2; // Worker has completed the task, waiting for the master to collect the output
   }
   Status status = 1;
 }

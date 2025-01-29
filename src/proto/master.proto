@@ -1,28 +1,28 @@
 syntax = "proto3";
 
 package master;
-
+option go_package = "./proto/master";
 
 service Master {
-  rpc RegisterWorkers(RegisterWorkersRequest) returns (RegisterWorkersResponse);
+  rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);
   rpc MapReduce(MapReduceRequest) returns (MapReduceResponse);
 }
 
 message WorkerAddress {
   string ip = 1;
-  int32 port = 2;
+  string port = 2;
 }
 
-message RegisterWorkersRequest {
-  repeated WorkerAddress workers = 1;
+message RegisterWorkerRequest {
+  WorkerAddress worker_address = 1;
 }
 
-message RegisterWorkersResponse {
+message RegisterWorkerResponse {
 }
 
 message MapReduceRequest {
   string input_dir = 1;
-  string intermediate_dir = 2;
+  string working_dir = 2;
 }
 
 message MapReduceResponse {

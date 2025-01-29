@@ -291,7 +291,7 @@ func processReduceTask(ctx context.Context, storageClient *storage.Client, task 
     - [ ] Error handling (also part of previous tasks).
     - [ ] Task management (either in-memory or using Pub/Sub).
     - [ ] Simple Map and Reduce functions for testing ([mit](https://github.com/zhou-yuhan/MIT-6.824-Distributed-Systems/tree/0c95023d5c36e08880c049d5fbb41c60d34e4299/labs/src/mrapps))
-
+- [ ] move script for proto generation to the right place.
 ## **Considerations:**
 
 * **Error Handling:** Task retries after deadline.
