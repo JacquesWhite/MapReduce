@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/JacquesWhite/MapReduce/src/mr"
+	"github.com/JacquesWhite/MapReduce/mr"
 	"log"
 	"os"
 	"plugin"

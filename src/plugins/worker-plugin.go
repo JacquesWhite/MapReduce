@@ -2,7 +2,7 @@
 package main
 
 import (
-	"github.com/JacquesWhite/MapReduce/src/mr"
+	"github.com/JacquesWhite/MapReduce/mr"
 	"strconv"
 	"strings"
 )

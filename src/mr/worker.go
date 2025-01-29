@@ -54,6 +54,16 @@ func WorkerMain(context WorkerContext) {
 		// which will contain the file name
 		// open it and pass the contents to the Map function
 
+		// Worker receives the message MapRequest
+		// With file to Map and directory in which we want to create file with intermediate results
+		// todo 1.
+
+		// Worker receives the message ReduceRequest
+		// With file containing intermediate results and directory in which we want to create file with final results
+		// todo 2.
+
+		// Later Master can just iterate through all files and collect the results
+
 		//fmt.Println("Worker")
 	}
 }
