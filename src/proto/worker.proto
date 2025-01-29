@@ -19,8 +19,8 @@ message MapResponse {
 }
 
 message ReduceRequest {
-  repeated string intermediate_file = 1;
-  string output_dir = 2;
+  repeated string intermediate_files = 1;
+  string output_file = 2;
 }
 
 message ReduceResponse {
