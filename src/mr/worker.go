@@ -74,8 +74,8 @@ func startWorkerServer(ctx WorkerContext) {
 	}
 }
 
-// Send message to Master with Worker address for further communication.
 func (w *WorkerService) sendRegisterRequest(ctx WorkerContext) {
+	// Send message to Master with Worker address for further communication.
 	addr := ctx.MasterIP + ":" + ctx.MasterPort
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
