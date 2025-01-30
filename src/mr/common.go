@@ -28,13 +28,13 @@ func IsSeparator(char int32) bool {
 	return !unicode.IsLetter(char)
 }
 
-// Use ihash(key) % NReduce to choose the reduce
-// task number for each KeyValue emitted by Map.
-func ihash(key string) int {
+// Use ihash(key) % NReduce to choose the bucket
+// in which the KeyValue will be emitted.
+func ihash(key string) int32 {
 	h := fnv.New32a()
 	_, err := h.Write([]byte(key))
 	if err != nil {
 		return 0
 	}
-	return int(h.Sum32() & 0x7fffffff)
+	return int32(h.Sum32() & 0x7fffffff)
 }

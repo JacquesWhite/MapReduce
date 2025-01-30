@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/JacquesWhite/MapReduce/mr"
 	"log"
 	"os"
 	"plugin"
+
+	"github.com/JacquesWhite/MapReduce/mr"
 )
 
 func main() {

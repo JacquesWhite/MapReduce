@@ -2,9 +2,10 @@
 package main
 
 import (
-	"github.com/JacquesWhite/MapReduce/mr"
 	"strconv"
 	"strings"
+
+	"github.com/JacquesWhite/MapReduce/mr"
 )
 
 // Some simple predefined functions for Map and Reduce

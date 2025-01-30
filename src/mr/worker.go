@@ -2,10 +2,10 @@ package mr
 
 import (
 	"context"
-	"google.golang.org/grpc/credentials/insecure"
 	"log"
 	"math/rand"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -13,6 +13,7 @@ import (
 	pbmaster "github.com/JacquesWhite/MapReduce/proto/master"
 	pbworker "github.com/JacquesWhite/MapReduce/proto/worker"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -99,20 +100,72 @@ func (w *WorkerService) sendRegisterRequest(ip string, port string, mp string) {
 
 func (w *WorkerService) Map(ctx context.Context, request *pbworker.MapRequest) (*pbworker.MapResponse, error) {
 	log.Println("Map request received")
-	// Worker receives the message MapRequest
-	// With file to Map and directory in which we want to create file with intermediate results
+	file := request.GetInputFile()
+	intermediateDir := request.GetIntermediateDir()
+	nPartitions := request.GetNumPartitions()
 
-	// upon receiving a message from the master
-	// which will contain the file name
-	// open it and pass the contents to the Map function
+	log.Println("Map request received with file:", file, "and intermediate directory:", intermediateDir)
+	w.statusMx.Lock()
+	w.status = pbworker.CheckStatusResponse_BUSY
+	w.statusMx.Unlock()
 
-	panic("implement me")
+	log.Println("Checking for Directory existence, if not creating it")
+	err := os.Mkdir(intermediateDir, os.ModePerm)
+	if os.IsExist(err) {
+		log.Println("The directory named ", intermediateDir, " exists, nothing created")
+	}
+
+	content, err := os.ReadFile(file)
+	if err != nil {
+		log.Println("Error reading file:", err)
+		return nil, err
+	}
+
+	log.Println("Invoking Map function on file contents")
+	mapRes := w.mapFunc(file, string(content))
+	kvAll := make([][]KeyValue, nPartitions)
+
+	// Map the results to the partitions (Map mapFunction results into nPartitions buckets)
+	for _, kv := range mapRes {
+		idx := ihash(kv.Key) % nPartitions
+		kvAll[idx] = append(kvAll[idx], kv)
+	}
+
+	// Write the partitioned results to the intermediate files
+	for i, kvs := range kvAll {
+		f, err := os.Create(intermediateDir + "/intermediate-" + strconv.Itoa(i))
+		if err != nil {
+			log.Println("Error creating file:", err)
+			return nil, err
+		}
+
+		for _, kv := range kvs {
+			_, err := f.WriteString(kv.Key + " " + kv.Value + "\n")
+			if err != nil {
+				log.Println("Error writing to file:", err)
+				return nil, err
+			}
+		}
+
+		err = f.Close()
+		if err != nil {
+			log.Println("Error closing file:", err)
+			return nil, err
+		}
+	}
+
+	log.Println("Map finished")
+	w.statusMx.Lock()
+	w.status = pbworker.CheckStatusResponse_IDLE
+	w.statusMx.Unlock()
+
+	return &pbworker.MapResponse{}, nil
 }
 
 func (w *WorkerService) Reduce(ctx context.Context, request *pbworker.ReduceRequest) (*pbworker.ReduceResponse, error) {
 	log.Println("Reduce request received")
 	// Worker receives the message ReduceRequest
-	// With file containing intermediate results and directory in which we want to create file with final results
+	// With files containing intermediate results and directory in which we want to create file with final results
 	// todo 2.
 
 	panic("implement me")
