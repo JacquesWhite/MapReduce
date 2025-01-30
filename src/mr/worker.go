@@ -1,11 +1,14 @@
 package mr
 
 import (
+	"bufio"
 	"context"
 	"log"
 	"net"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -164,11 +167,72 @@ func (w *WorkerService) Map(_ context.Context, request *pbworker.MapRequest) (*p
 
 func (w *WorkerService) Reduce(ctx context.Context, request *pbworker.ReduceRequest) (*pbworker.ReduceResponse, error) {
 	log.Println("Reduce request received")
-	// Worker receives the message ReduceRequest
-	// With files containing intermediate results and directory in which we want to create file with final results
-	// todo 2.
+	intermediateFiles := request.GetIntermediateFiles()
+	outputFile := request.GetOutputFile()
 
-	panic("implement me")
+	log.Println("Reduce request received with output file:", outputFile)
+	w.statusMx.Lock()
+	w.status = pbworker.CheckStatusResponse_BUSY
+	w.statusMx.Unlock()
+
+	// Read all files with intermediate output from Maps
+	var intermediate []KeyValue
+	for _, file := range intermediateFiles {
+		content, err := os.ReadFile(file)
+		if err != nil {
+			log.Println("Error reading file:", err)
+			return nil, err
+		}
+
+		log.Println("Reading file:", file)
+		scanner := bufio.NewScanner(strings.NewReader(string(content)))
+		for scanner.Scan() {
+			line := scanner.Text()
+			parts := strings.Split(line, " ")
+			kv := KeyValue{Key: parts[0], Value: parts[1]}
+			intermediate = append(intermediate, kv)
+		}
+	}
+
+	log.Println("Sorting intermediate results")
+	sort.Sort(ByKey(intermediate))
+
+	log.Println("Create the output file (if exists, truncate it)")
+	outFile, err := os.Create(outputFile)
+	if err != nil {
+		log.Println("Error creating file:", err)
+		return nil, err
+	}
+
+	// Reduce the values with the same key and write them to the output file
+	i := 0
+	for i < len(intermediate) {
+		j := i + 1
+		for j < len(intermediate) && intermediate[j].Key == intermediate[i].Key {
+			j++
+		}
+
+		var values []string
+		for k := i; k < j; k++ {
+			values = append(values, intermediate[k].Value)
+		}
+
+		output := w.reduceFunc(intermediate[i].Key, values)
+		_, err := outFile.WriteString(intermediate[i].Key + " " + output + "\n")
+		if err != nil {
+			log.Println("Error writing to file:", err)
+			return nil, err
+		}
+
+		i = j
+	}
+
+	log.Println("Reduce request finished")
+	w.statusMx.Lock()
+	w.status = pbworker.CheckStatusResponse_IDLE
+	w.statusMx.Unlock()
+
+	return &pbworker.ReduceResponse{}, nil
 }
 
 func (w *WorkerService) CheckStatus(_ context.Context, _ *pbworker.CheckStatusRequest) (*pbworker.CheckStatusResponse, error) {
@@ -184,31 +248,3 @@ func (w *WorkerService) CheckStatus(_ context.Context, _ *pbworker.CheckStatusRe
 
 	return res, nil
 }
-
-//var intermediate []KeyValue
-//content, err := os.ReadFile("../datasets/test.txt")
-//if err != nil {
-//return
-//}
-//
-//kva := workerCtx.MapFunc("../datasets/test.txt", string(content))
-//intermediate = append(intermediate, kva...)
-//
-//sort.Sort(ByKey(intermediate))
-//
-//i := 0
-//for i < len(intermediate) {
-//j := i + 1
-//for j < len(intermediate) && intermediate[j].Key == intermediate[i].Key {
-//j++
-//}
-//var values []string
-//for k := i; k < j; k++ {
-//values = append(values, intermediate[k].Value)
-//}
-//output := workerCtx.ReduceFunc(intermediate[i].Key, values)
-//// this is the correct format for each line of Reduce output.
-//// please do not change it.
-//fmt.Println(intermediate[i].Key, output)
-//i = j
-//}

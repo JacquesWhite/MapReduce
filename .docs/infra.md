@@ -2,7 +2,7 @@
 
 ## Core Concepts of a Distributed MapReduce Framework
 
-0. **MapReduce runner:**
+1. **MapReduce runner:**
     * maybe even in bash.
     * Compiles Map and Reduce functions to go plugins and uploads them to GCS or to worker machines directly (gcloud scp/scp).
     * Uploads input data to GCS.
@@ -10,12 +10,12 @@
         **Master input:** input data location, worker ip's, port
         **Worker input:** master ip, port, function to run
 
-1. **Master Node:**
+2. **Master Node:**
     * Assigns Map and Reduce tasks to worker nodes.
     * Tracks the status of tasks (idle, in-progress, completed).
     * Handles worker failures (re-assigns tasks after deadline).
 
-2. **Worker Nodes:**
+3. **Worker Nodes:**
     * Download/load Map and Reduce functions.
     * Execute Map and Reduce tasks assigned by the Master.
     * Read input data for Map tasks.
@@ -23,14 +23,14 @@
     * Shuffle and sort intermediate data for Reduce tasks.
     * Write final output data (output of Reduce).
 
-3. **Input Data:**
+4. **Input Data:**
     * IMHO text file/file.
 
-4. **Intermediate Data:**
+5. **Intermediate Data:**
     * Key-value pairs produced by the Map tasks.
     * Sorted/grouped by key before being sent to Reduce tasks.
 
-5. **Output Data:**
+6. **Output Data:**
     * Final results produced by the Reduce tasks.
 
 ## Google Cloud Technologies
@@ -281,13 +281,13 @@ func processReduceTask(ctx context.Context, storageClient *storage.Client, task 
 <!--  -->
 - [x] **Set up a Google Cloud Project:** Create a project in the Google Cloud Console.
 - [x] **Enable APIs:** Enable the Compute Engine, Cloud Storage, and Pub/Sub APIs (if we choose to use it).
-- [ ] **Configure Netwirking:** open ports and write bash program to run by master to run things on workers.
+- [ ] **Configure Networking:** open ports and write bash program to run by master to run things on workers.
 - [ ] **Write the Code:**
     - [x] Loading Map and Reduce functions from plugins.
     - [ ] GCS interaction for reading/writing data.
     - [ ] Task assignment and tracking logic in the Master.
-    - [ ] Task execution logic in the Workers.
-    - [ ] Communication between the Master and Workers using RPC.
+    - [x] Task execution logic in the Workers.
+    - [x] Communication between the Master and Workers using RPC.
     - [ ] Error handling (also part of previous tasks).
     - [ ] Task management (either in-memory or using Pub/Sub).
     - [x] Simple Map and Reduce functions for testing ([mit](https://github.com/zhou-yuhan/MIT-6.824-Distributed-Systems/tree/0c95023d5c36e08880c049d5fbb41c60d34e4299/labs/src/mrapps))

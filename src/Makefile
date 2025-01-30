@@ -1,10 +1,10 @@
 .PHONY: runWorker runMaster build clean
 
 runWorker:
-	./main/main-worker 127.0.0.1 12372 127.0.0.1 plugins/worker-plugin.so
+	./main/main-worker 127.0.0.1 12377 127.0.0.1 plugins/worker-plugin.so
 
 runMaster:
-	./main/mock-master 12372 ../datasets/test.txt
+	./main/mock-master 12377 ../datasets/test.txt
 
 build:
 	(cd plugins && go build -buildmode=plugin worker-plugin.go)
