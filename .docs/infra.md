@@ -283,14 +283,14 @@ func processReduceTask(ctx context.Context, storageClient *storage.Client, task 
 - [x] **Enable APIs:** Enable the Compute Engine, Cloud Storage, and Pub/Sub APIs (if we choose to use it).
 - [ ] **Configure Netwirking:** open ports and write bash program to run by master to run things on workers.
 - [ ] **Write the Code:**
-    - [ ] Loading Map and Reduce functions from plugins.
+    - [x] Loading Map and Reduce functions from plugins.
     - [ ] GCS interaction for reading/writing data.
     - [ ] Task assignment and tracking logic in the Master.
     - [ ] Task execution logic in the Workers.
     - [ ] Communication between the Master and Workers using RPC.
     - [ ] Error handling (also part of previous tasks).
     - [ ] Task management (either in-memory or using Pub/Sub).
-    - [ ] Simple Map and Reduce functions for testing ([mit](https://github.com/zhou-yuhan/MIT-6.824-Distributed-Systems/tree/0c95023d5c36e08880c049d5fbb41c60d34e4299/labs/src/mrapps))
+    - [x] Simple Map and Reduce functions for testing ([mit](https://github.com/zhou-yuhan/MIT-6.824-Distributed-Systems/tree/0c95023d5c36e08880c049d5fbb41c60d34e4299/labs/src/mrapps))
 - [ ] move script for proto generation to the right place.
 ## **Considerations:**
 

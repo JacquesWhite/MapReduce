@@ -5,6 +5,9 @@ import (
 	"unicode"
 )
 
+type MapFuncT = func(string, string) []KeyValue
+type ReduceFuncT = func(string, []string) string
+
 // KeyValue struct - Map functions return an array of KeyValue.
 type KeyValue struct {
 	// Key - what are we mapping

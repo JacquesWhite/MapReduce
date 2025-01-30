@@ -17,4 +17,4 @@
 #sleep 1
 
 # Run Worker
-timeout -k 2s 180s ./main/main-worker 127.0.0.1 12345 plugins/worker-plugin.so
+timeout -k 2s 180s ./main/main-worker 127.0.0.1 12361 plugins/worker-plugin.so

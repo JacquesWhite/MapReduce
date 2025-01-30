@@ -32,7 +32,7 @@ func main() {
 // Load the Map and Reduce functions for Worker for further use
 // Even if we have Map and Reduce functions predefined, this can be
 // useful for further expansion of the project.
-func loadPlugin(filename string) (func(string, string) []mr.KeyValue, func(string, []string) string) {
+func loadPlugin(filename string) (mr.MapFuncT, mr.ReduceFuncT) {
 	p, err := plugin.Open(filename)
 	if err != nil {
 		log.Fatalf("cannot load plugin %v", filename)
@@ -42,13 +42,13 @@ func loadPlugin(filename string) (func(string, string) []mr.KeyValue, func(strin
 	if err != nil {
 		log.Fatalf("cannot find Map function in %v", filename)
 	}
-	mapFunc := lookupMapFunc.(func(string, string) []mr.KeyValue)
+	mapFunc := lookupMapFunc.(mr.MapFuncT)
 
 	lookupReduceFunc, err := p.Lookup("Reduce")
 	if err != nil {
 		log.Fatalf("cannot find Reduce in %v", filename)
 	}
-	reduceFunc := lookupReduceFunc.(func(string, []string) string)
+	reduceFunc := lookupReduceFunc.(mr.ReduceFuncT)
 
 	return mapFunc, reduceFunc
 }
