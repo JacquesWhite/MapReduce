@@ -3,7 +3,6 @@ package mr
 import (
 	"context"
 	"log"
-	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -20,6 +19,8 @@ import (
 type WorkerContext struct {
 	MasterIP   string
 	MasterPort string
+	WorkerIP   string
+	WorkerPort string
 	MapFunc    MapFuncT
 	ReduceFunc ReduceFuncT
 }
@@ -42,13 +43,12 @@ func NewWorkerService(m MapFuncT, r ReduceFuncT) *WorkerService {
 }
 
 func WorkerMain(workerCtx WorkerContext) {
-	myPort := strconv.Itoa(rand.Intn(60000))
-	startWorkerServer(workerCtx, myPort)
+	startWorkerServer(workerCtx)
 }
 
-func startWorkerServer(ctx WorkerContext, port string) {
+func startWorkerServer(ctx WorkerContext) {
 	// Start server first, as it takes a second to boot up
-	listener, err := net.Listen("tcp", ":"+port)
+	listener, err := net.Listen("tcp", ":"+ctx.WorkerPort)
 	if err != nil {
 		panic(err)
 	}
@@ -59,21 +59,21 @@ func startWorkerServer(ctx WorkerContext, port string) {
 	reflection.Register(srv)
 
 	// Register Worker with Master on created WorkerService
-	go func() { ws.sendRegisterRequest(ctx.MasterIP, ctx.MasterPort, port) }()
+	go func() { ws.sendRegisterRequest(ctx) }()
 
 	// Wait for the Registration to fully be delivered
 	time.Sleep(1 * time.Second)
 
 	// Handle the messages and do the work
-	log.Println("Worker is running on port", port)
+	log.Println("Worker is running on port", ctx.WorkerPort)
 	if err := srv.Serve(listener); err != nil {
 		panic(err)
 	}
 }
 
 // Send message to Master with Worker address for further communication.
-func (w *WorkerService) sendRegisterRequest(ip string, port string, mp string) {
-	addr := ip + ":" + port
+func (w *WorkerService) sendRegisterRequest(ctx WorkerContext) {
+	addr := ctx.MasterIP + ":" + ctx.MasterPort
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return
@@ -83,10 +83,10 @@ func (w *WorkerService) sendRegisterRequest(ip string, port string, mp string) {
 	req := &pbmaster.RegisterWorkerRequest{
 		WorkerAddress: &pbmaster.WorkerAddress{
 			// Currently localhost, further may be passed as an argument
-			Ip: "127.0.0.1",
+			Ip: ctx.WorkerIP,
 
 			// Client port passed to Master
-			Port: mp,
+			Port: ctx.WorkerPort,
 		},
 	}
 

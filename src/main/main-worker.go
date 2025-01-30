@@ -3,26 +3,30 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"plugin"
+	"strconv"
 
 	"github.com/JacquesWhite/MapReduce/mr"
 )
 
 func main() {
-	if len(os.Args) != 4 {
-		fmt.Println("Please provide Master ip and port for connection + plugin file with Map and Reduce functions")
-		_, err := fmt.Fprintf(os.Stderr, "Usage: ./main-worker master_ip master_port {file_name}.so\n")
+	if len(os.Args) != 5 {
+		fmt.Println("Please provide Master ip and port for connection + WorkerIP + plugin file with Map and Reduce functions")
+		_, err := fmt.Fprintf(os.Stderr, "Usage: ./main-worker master_ip master_port worker_ip {file_name}.so\n")
 		if err != nil {
 			return
 		}
 		os.Exit(1)
 	}
 
-	mapFunc, reduceFunc := loadPlugin(os.Args[3])
+	mapFunc, reduceFunc := loadPlugin(os.Args[4])
 	workerContext := mr.WorkerContext{
 		MasterIP:   os.Args[1],
 		MasterPort: os.Args[2],
+		WorkerIP:   os.Args[3],
+		WorkerPort: strconv.Itoa(rand.Intn(60000)),
 		MapFunc:    mapFunc,
 		ReduceFunc: reduceFunc,
 	}
