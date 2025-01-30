@@ -1,10 +1,10 @@
 .PHONY: runWorker runMaster build clean
 
 runWorker:
-	./main/main-worker 127.0.0.1 12377 127.0.0.1 plugins/worker-plugin.so
+	./main/main-worker 127.0.0.1 12381 127.0.0.1 plugins/worker-plugin.so
 
 runMaster:
-	./main/mock-master 12377 ../datasets/test.txt
+	./main/mock-master 12381 ../datasets/pg-dorian_gray.txt
 
 build:
 	(cd plugins && go build -buildmode=plugin worker-plugin.go)
@@ -16,3 +16,4 @@ clean:
 	rm -f main/mock-master
 	rm -f plugins/*.so
 	rm -rf intermediate
+	rm -f output
