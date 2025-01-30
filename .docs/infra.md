@@ -85,7 +85,7 @@ package main
 
 //
 // start a worker process, which is implemented
-// in ../mr/worker.go. typically there will be
+// in ../worker/worker.go. typically there will be
 // multiple worker processes, talking to one master.
 //
 // go run mrworker.go wc.so

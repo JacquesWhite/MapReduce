@@ -8,7 +8,7 @@ import (
 	"plugin"
 	"strconv"
 
-	"github.com/JacquesWhite/MapReduce/mr"
+	"github.com/JacquesWhite/MapReduce/worker"
 )
 
 func main() {
@@ -22,7 +22,7 @@ func main() {
 	}
 
 	mapFunc, reduceFunc := loadPlugin(os.Args[4])
-	workerContext := mr.WorkerContext{
+	contextWorker := worker.ContextWorker{
 		MasterIP:   os.Args[1],
 		MasterPort: os.Args[2],
 		WorkerIP:   os.Args[3],
@@ -31,13 +31,13 @@ func main() {
 		ReduceFunc: reduceFunc,
 	}
 
-	mr.WorkerMain(workerContext)
+	worker.StartWorkerServer(contextWorker)
 }
 
 // Load the Map and Reduce functions for Worker for further use
 // Even if we have Map and Reduce functions predefined, this can be
 // useful for further expansion of the project.
-func loadPlugin(filename string) (mr.MapFuncT, mr.ReduceFuncT) {
+func loadPlugin(filename string) (worker.MapFuncT, worker.ReduceFuncT) {
 	p, err := plugin.Open(filename)
 	if err != nil {
 		log.Fatalf("cannot load plugin %v", filename)
@@ -47,13 +47,13 @@ func loadPlugin(filename string) (mr.MapFuncT, mr.ReduceFuncT) {
 	if err != nil {
 		log.Fatalf("cannot find Map function in %v", filename)
 	}
-	mapFunc := lookupMapFunc.(mr.MapFuncT)
+	mapFunc := lookupMapFunc.(worker.MapFuncT)
 
 	lookupReduceFunc, err := p.Lookup("Reduce")
 	if err != nil {
 		log.Fatalf("cannot find Reduce in %v", filename)
 	}
-	reduceFunc := lookupReduceFunc.(mr.ReduceFuncT)
+	reduceFunc := lookupReduceFunc.(worker.ReduceFuncT)
 
 	return mapFunc, reduceFunc
 }
