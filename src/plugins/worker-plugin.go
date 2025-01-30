@@ -14,7 +14,7 @@ import (
 // which will be predefined by the Master.
 // (Master will divide the file and pass it to the Workers)
 
-func Map(f string, contents string) []mr.KeyValue {
+func Map(_ string, contents string) []mr.KeyValue {
 	// Split file contents into an array of words.
 	words := strings.FieldsFunc(contents, mr.IsSeparator)
 
@@ -28,7 +28,7 @@ func Map(f string, contents string) []mr.KeyValue {
 	return kva
 }
 
-func Reduce(key string, values []string) string {
+func Reduce(_ string, values []string) string {
 	// Returns the number of occurrences of this word.
 	return strconv.Itoa(len(values))
 }

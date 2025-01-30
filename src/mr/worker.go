@@ -98,7 +98,7 @@ func (w *WorkerService) sendRegisterRequest(ip string, port string, mp string) {
 	log.Println("Sent RegisterWorker request with Worker info to Master")
 }
 
-func (w *WorkerService) Map(ctx context.Context, request *pbworker.MapRequest) (*pbworker.MapResponse, error) {
+func (w *WorkerService) Map(_ context.Context, request *pbworker.MapRequest) (*pbworker.MapResponse, error) {
 	log.Println("Map request received")
 	file := request.GetInputFile()
 	intermediateDir := request.GetIntermediateDir()
