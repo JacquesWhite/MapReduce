@@ -104,50 +104,34 @@ type Service struct {
 }
 
 func (t *mapTask) CheckState() TaskState {
-	t.mx.Lock()
-	defer t.mx.Unlock()
 	return t.state
 }
 
 func (t *reduceTask) CheckState() TaskState {
-	t.mx.Lock()
-	defer t.mx.Unlock()
 	return t.state
 }
 
 func (t *mapTask) ChangeState(state TaskState) {
-	t.mx.Lock()
-	defer t.mx.Unlock()
 	t.state = state
 }
 
 func (t *reduceTask) ChangeState(state TaskState) {
-	t.mx.Lock()
-	defer t.mx.Unlock()
 	t.state = state
 }
 
 func (t *mapTask) CheckWorker() *workerpb.WorkerClient {
-	t.mx.Lock()
-	defer t.mx.Unlock()
 	return t.worker
 }
 
 func (t *reduceTask) CheckWorker() *workerpb.WorkerClient {
-	t.mx.Lock()
-	defer t.mx.Unlock()
 	return t.worker
 }
 
 func (t *mapTask) CheckId() int {
-	t.mx.Lock()
-	defer t.mx.Unlock()
 	return t.id
 }
 
 func (t *reduceTask) CheckId() int {
-	t.mx.Lock()
-	defer t.mx.Unlock()
 	return t.id
 }
 
@@ -265,7 +249,6 @@ func (t *reduceTask) RunTask(ctx context.Context, worker *workerpb.WorkerClient,
 	t.state = Assigned
 	inputFiles := t.inputFiles
 	outputFile := t.outputFile
-	service.mx.Unlock()
 	go func() {
 		res, err := (*worker).Reduce(ctx, &workerpb.ReduceRequest{
 			IntermediateFiles: inputFiles,
@@ -287,7 +270,6 @@ func (t *mapTask) RunTask(ctx context.Context, worker *workerpb.WorkerClient, se
 	t.ChangeState(Assigned)
 	inputFile := t.inputFile
 	intermediateDir := t.intermediateDir
-	service.mx.Unlock()
 	go func() {
 		res, err := (*worker).Map(ctx, &workerpb.MapRequest{
 			InputFile:       inputFile,
@@ -322,11 +304,9 @@ func checkWorkerStatus(ctx context.Context, worker *workerpb.WorkerClient, taskI
 }
 
 func (s *Service) createMapTaskCopy(idx int) error {
-	s.mx.Lock()
 	task := s.mapTasks[idx]
 	newId := len(s.mapTasks)
 	taskDir := fmt.Sprintf("%s/map_%d", s.intermediateDir, newId)
-	s.mx.Unlock()
 	err := os.MkdirAll(taskDir, os.ModePerm)
 	if err != nil {
 		return status.Errorf(codes.Internal, "Failed to create intermediate directory: %v", err)
@@ -338,17 +318,13 @@ func (s *Service) createMapTaskCopy(idx int) error {
 		intermediateDir: taskDir,
 		state:           NotAssigned,
 	}
-	s.mx.Lock()
 	s.mapTasks = append(s.mapTasks, newTask)
-	s.mx.Unlock()
 	return nil
 }
 
 func (s *Service) createReduceTaskCopy(idx int) error {
-	s.mx.Lock()
 	task := s.reduceTasks[idx]
 	newId := len(s.reduceTasks)
-	s.mx.Unlock()
 	newTask := &reduceTask{
 		id:         newId,
 		worker:     nil,
@@ -356,9 +332,7 @@ func (s *Service) createReduceTaskCopy(idx int) error {
 		outputFile: fmt.Sprintf("%s/%d", s.outputDir, newId),
 		state:      NotAssigned,
 	}
-	s.mx.Lock()
 	s.reduceTasks = append(s.reduceTasks, newTask)
-	s.mx.Unlock()
 	return nil
 }
 
@@ -389,13 +363,13 @@ func (s *Service) monitorTaskExecution(ctx context.Context, idx int, task Runnab
 	case Done:
 		log.Printf("Master noticed that worker has completed task %d", task.CheckId())
 		task.ChangeState(Completed)
-		s.mx.Lock()
 		switch task.(type) {
 		case *mapTask:
 			s.mapTaskToProcess--
 		case *reduceTask:
 			s.reduceTaskToProcess--
 		}
+		s.mx.Lock()
 		s.workers[task.CheckWorker()] = true
 		s.mx.Unlock()
 	default:
@@ -408,11 +382,10 @@ func (s *Service) assignTaskToWorker(ctx context.Context, task RunnableTask) {
 	for worker := range s.workers {
 		s.mx.Lock()
 		available := s.workers[worker]
+		s.mx.Unlock()
 		if available {
 			task.RunTask(ctx, worker, s)
 			break
-		} else {
-			s.mx.Unlock()
 		}
 	}
 }
@@ -420,13 +393,9 @@ func (s *Service) assignTaskToWorker(ctx context.Context, task RunnableTask) {
 func (s *Service) processReduceTasks(ctx context.Context) error {
 	log.Printf("Processing reduce tasks")
 	for s.reduceTaskToProcess > 0 {
-		s.mx.Lock()
 		numberOfTasks := len(s.reduceTasks)
-		s.mx.Unlock()
 		for idx := range numberOfTasks {
-			s.mx.Lock()
 			task := s.reduceTasks[idx]
-			s.mx.Unlock()
 			if task.CheckState() == NotAssigned {
 				s.assignTaskToWorker(ctx, task)
 			} else if task.CheckState() == Assigned {
@@ -444,13 +413,9 @@ func (s *Service) processReduceTasks(ctx context.Context) error {
 func (s *Service) processMapTasks(ctx context.Context) error {
 	log.Printf("Processing map tasks")
 	for s.mapTaskToProcess > 0 {
-		s.mx.Lock()
 		numberOfTasks := len(s.mapTasks)
-		s.mx.Unlock()
 		for idx := range numberOfTasks {
-			s.mx.Lock()
 			task := s.mapTasks[idx]
-			s.mx.Unlock()
 			if task.CheckState() == NotAssigned {
 				s.assignTaskToWorker(ctx, task)
 			} else if task.CheckState() == Assigned {
@@ -529,9 +494,9 @@ func (s *Service) RegisterWorker(ctx context.Context, req *masterpb.RegisterWork
 
 func (s *Service) MapReduce(ctx context.Context, req *masterpb.MapReduceRequest) (*masterpb.MapReduceResponse, error) {
 	log.Printf("Received MapReduce request: %v", req)
-	logLineSeparator()
 	s.mr.Lock()
 	defer s.mr.Unlock()
+	logLineSeparator()
 	err := s.initializeMapReduce(req)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Map reduce: failed to initialize map reduce: %v", err)
