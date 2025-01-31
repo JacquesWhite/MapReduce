@@ -1,4 +1,4 @@
-.PHONY: default buildProto buildWorker buildWorkerPlugin runWorker runMaster build clean
+.PHONY: default buildProto buildWorker buildPluginWordcount buildPluginCrash runWorker runMaster build clean
 
 default: build
 
@@ -10,9 +10,13 @@ buildWorker:
 	mkdir -p ../bin
 	go build -o bin/worker runner/worker_runner.go
 
-buildWorkerPlugin:
+buildPluginWordcount:
 	mkdir -p ../bin
-	go build -buildmode=plugin -o bin/worker_plugin.so worker/plugins/worker-plugin.go
+	go build -buildmode=plugin -o bin/worker_plugin.so worker/plugins/wordcount/worker-plugin-wordcount.go
+
+buildPluginCrash:
+	mkdir -p ../bin
+	go build -buildmode=plugin -o bin/worker_plugin.so worker/plugins/crash/worker-plugin-crash.go
 
 buildProto:
 	mkdir -p proto/master
@@ -30,7 +34,7 @@ runWorker:
 runMaster:
 	./bin/master --port=12382
 
-build: buildProto buildMaster buildWorker buildWorkerPlugin
+build: buildProto buildMaster buildWorker buildPluginWordcount
 
 clean:
 	rm -r bin

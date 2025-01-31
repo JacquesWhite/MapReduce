@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# If no arguments passed, show help
+if [ $# -eq 0 ]; then
+    echo "Usage: ./build.sh [PLUGIN]"
+    echo "  PLUGIN: The Map-Reduce plugin to build. "
+    echo "  Available plugin options: --wordcount, --crash"
+    exit 0
+fi
+
 # Store the current directory
 current_dir=$(pwd)
 
@@ -32,9 +40,14 @@ build_fake_worker() {
   go build -o ../bin/fake_worker ../runner/fake_worker_runner.go
 }
 
-build_worker_plugin() {
+build_worker_plugin_wordcount() {
   mkdir -p ../bin
-  go build -buildmode=plugin -o ../bin/worker_plugin.so ../worker/plugins/worker-plugin.go
+  go build -buildmode=plugin -o ../bin/worker_plugin.so ../worker/plugins/wordcount/worker-plugin-wordcount.go
+}
+
+build_worker_plugin_crash() {
+  mkdir -p ../bin
+  go build -buildmode=plugin -o ../bin/worker_plugin.so ../worker/plugins/crash/worker-plugin-crash.go
 }
 
 echo "Building the project..."
@@ -52,8 +65,17 @@ echo "Building the worker..."
 build_worker
 echo "Building the fake worker..."
 build_fake_worker
-echo "Building the worker plugin..."
-build_worker_plugin
+
+if [ "$1" == "--wordcount" ]; then
+  echo "Building the wordcount worker plugin..."
+  build_worker_plugin_wordcount
+elif [ "$1" == "--crash" ]; then
+  echo "Building the crash worker plugin..."
+  build_worker_plugin_crash
+else
+  echo "Building the wordcount worker plugin... (default)"
+  build_worker_plugin_wordcount
+fi
 
 echo "Finished"
 # Change back to the original directory
