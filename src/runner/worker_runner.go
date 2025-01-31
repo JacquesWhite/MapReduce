@@ -1,37 +1,32 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"math/rand"
-	"os"
-	"plugin"
-	"strconv"
-
+	"flag"
+	"github.com/JacquesWhite/MapReduce/runner/worker_startup"
 	"github.com/JacquesWhite/MapReduce/worker"
+	"log"
+	"plugin"
 )
 
 func main() {
-	if len(os.Args) != 5 {
-		fmt.Println("Please provide Master ip and port for connection + WorkerIP + plugin file with Map and Reduce functions")
-		_, err := fmt.Fprintf(os.Stderr, "Usage: ./main-worker master_ip master_port worker_ip {file_name}.so\n")
-		if err != nil {
-			return
-		}
-		os.Exit(1)
-	}
+	workerPort := flag.String("w_port", "50001", "The worker port")
+	workerIP := flag.String("w_ip", "localhost", "The worker IP")
+	masterPort := flag.String("m_port", "50051", "The master port")
+	masterIP := flag.String("m_ip", "localhost", "The master IP")
+	pluginFile := flag.String("plugin", "", "The plugin file with Map and Reduce functions")
+	flag.Parse()
 
-	mapFunc, reduceFunc := loadPlugin(os.Args[4])
-	contextWorker := worker.ContextWorker{
-		MasterIP:   os.Args[1],
-		MasterPort: os.Args[2],
-		WorkerIP:   os.Args[3],
-		WorkerPort: strconv.Itoa(rand.Intn(60000)),
+	mapFunc, reduceFunc := loadPlugin(*pluginFile)
+	contextWorker := worker_startup.ContextWorker{
+		MasterIP:   *masterIP,
+		MasterPort: *masterPort,
+		WorkerIP:   *workerIP,
+		WorkerPort: *workerPort,
 		MapFunc:    mapFunc,
 		ReduceFunc: reduceFunc,
 	}
 
-	worker.StartWorkerServer(contextWorker)
+	worker_startup.StartWorkerServer(contextWorker)
 }
 
 // Load the Map and Reduce functions for Worker for further use

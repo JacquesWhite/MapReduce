@@ -1,19 +1,38 @@
-.PHONY: runWorker runMaster build clean
+.PHONY: default buildProto buildWorker buildWorkerPlugin runWorker runMaster build clean
+
+default: build
+
+buildMaster:
+	mkdir -p ../bin
+	go build -o bin/master runner/master_runner.go
+
+buildWorker:
+	mkdir -p ../bin
+	go build -o bin/worker runner/worker_runner.go
+
+buildWorkerPlugin:
+	mkdir -p ../bin
+	go build -buildmode=plugin -o bin/worker_plugin.so worker/plugins/worker-plugin.go
+
+buildProto:
+	mkdir -p proto/master
+	mkdir -p proto/worker
+
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+	protoc --proto_path=proto --go_out=proto/master --go_opt=paths=source_relative --go-grpc_out=proto/master --go-grpc_opt=paths=source_relative ./proto/master.proto
+	protoc --proto_path=proto --go_out=proto/worker --go_opt=paths=source_relative --go-grpc_out=proto/worker --go-grpc_opt=paths=source_relative ./proto/worker.proto
 
 runWorker:
-	./main/main-worker 127.0.0.1 12382 127.0.0.1 plugins/worker-plugin.so
+	./bin/worker 127.0.0.1 12382 127.0.0.1 worker/plugins/worker-plugin.so
 
 runMaster:
-	./main/mock-master 12382 ../datasets/pg-dorian_gray.txt
+	./bin/master --port=12382
 
-build:
-	(cd plugins && go build -buildmode=plugin worker-plugin.go)
-	(cd main && go build main-worker.go)
-	(cd main && go build mock-master.go)
+build: buildProto buildMaster buildWorker buildWorkerPlugin
 
 clean:
-	rm -f main/main-worker
-	rm -f main/mock-master
-	rm -f plugins/*.so
+	rm -r bin
 	rm -rf intermediate
 	rm -f output
