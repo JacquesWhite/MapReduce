@@ -29,7 +29,7 @@ build_worker() {
 
 build_worker_plugin() {
   mkdir -p ../bin
-  go build -o ../bin/worker_plugin ../worker/plugins/worker-plugin.go
+  go build -buildmode=plugin -o ../bin/worker_plugin.so ../worker/plugins/worker-plugin.go
 }
 
 echo "Building the project..."

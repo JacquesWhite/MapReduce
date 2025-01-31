@@ -36,7 +36,7 @@ func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
 
 func IsSeparator(char int32) bool {
-	return !unicode.IsLetter(char)
+	return !unicode.IsLetter(char) && !(char == '-')
 }
 
 func ihashIdx(key string, nParts int32) int32 {
