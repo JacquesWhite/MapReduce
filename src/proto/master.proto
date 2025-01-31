@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package master;
+option go_package = "github.com/JacquesWhite/MapReduce/proto/master";
+
+service Master {
+  rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);
+  rpc MapReduce(MapReduceRequest) returns (MapReduceResponse);
+}
+
+message WorkerAddress {
+  string ip = 1;
+  string port = 2;
+}
+
+message RegisterWorkerRequest {
+  WorkerAddress worker_address = 1;
+}
+
+message RegisterWorkerResponse {
+}
+
+message MapReduceRequest {
+  string input_dir = 1;
+  string working_dir = 2;
+}
+
+message MapReduceResponse {
+  string output_dir = 1;
+}

@@ -8,6 +8,11 @@
 *.so
 *.dylib
 
+# Project generated file
+src/proto/master/
+src/proto/worker/
+src/bin/
+
 # Test binary, built with `go test -c`
 *.test
 
