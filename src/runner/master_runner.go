@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"github.com/JacquesWhite/MapReduce/master"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -12,6 +13,12 @@ import (
 )
 
 func main() {
+	// Define a flag for the port
+	port := flag.String("port", "50051", "The server port")
+
+	// Parse the flags
+	flag.Parse()
+
 	grpcServer := grpc.NewServer(grpc.Creds(insecure.NewCredentials()))
 	masterService := master.NewService()
 	masterpb.RegisterMasterServer(grpcServer, masterService)
@@ -19,12 +26,12 @@ func main() {
 	// Enable server reflection
 	reflection.Register(grpcServer)
 
-	listener, err := net.Listen("tcp", ":50051")
+	listener, err := net.Listen("tcp", ":"+*port)
 	if err != nil {
-		log.Fatalf("Failed to listen on port 50051: %v", err)
+		log.Fatalf("Failed to listen on port %s: %v", *port, err)
 	}
 
-	log.Println("Starting gRPC server on port 50051...")
+	log.Println("Starting gRPC server on port ", *port)
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("Failed to serve gRPC server: %v", err)
 	}

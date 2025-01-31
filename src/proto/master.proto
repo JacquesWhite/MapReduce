@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package master;
-option go_package = "./proto/master";
+option go_package = "github.com/JacquesWhite/MapReduce/proto/master";
 
 service Master {
   rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);

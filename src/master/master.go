@@ -46,6 +46,10 @@ type ReduceTask struct {
 	state      TaskState
 }
 
+type RunnableTask interface {
+	RunTask(ctx context.Context, worker *workerpb.WorkerClient, service *Service)
+}
+
 type Service struct {
 	masterpb.UnimplementedMasterServer
 
@@ -100,56 +104,6 @@ func (s *Service) createMapTasks() error {
 	return nil
 }
 
-func (s *Service) processMapTasks(ctx context.Context) {
-	log.Printf("Processing map tasks")
-	for s.mapTaskToProcess > 0 {
-		for idx := range s.mapTasks {
-			s.mx.Lock()
-			task := s.mapTasks[idx]
-			if task.state == NotAssigned {
-				s.mx.Unlock()
-				for worker := range s.workers {
-					s.mx.Lock()
-					available := s.workers[worker]
-					if available {
-						log.Printf("Assigning map task %d to worker %v", task.id, worker)
-						s.workers[worker] = false
-						task.worker = worker
-						task.state = Assigned
-						inputFile := task.inputFile
-						intermediateDir := task.intermediateDir
-						s.mx.Unlock()
-						go func() {
-							_, err := (*worker).Map(ctx, &workerpb.MapRequest{
-								InputFile:       inputFile,
-								IntermediateDir: intermediateDir,
-								NumPartitions:   s.numberOfPartitions,
-							})
-							if err != nil {
-								log.Printf("Error while processing map task: %v", err)
-							}
-							log.Printf("Completed map task %d", task.id)
-							s.mx.Lock()
-							log.Printf("2Completed map task %d", task.id)
-							task.state = Completed
-							s.mapTaskToProcess--
-							s.workers[worker] = true
-							//s.mapResults <- res
-							s.mx.Unlock()
-						}()
-						break
-					} else {
-						s.mx.Unlock()
-					}
-				}
-			} else {
-				s.mx.Unlock()
-			}
-		}
-	}
-	log.Printf("Completed processing map tasks")
-}
-
 func (s *Service) createReduceTasks() error {
 	log.Printf("Creating reduce tasks")
 	if s.mapTaskToProcess != 0 {
@@ -178,6 +132,74 @@ func (s *Service) createReduceTasks() error {
 	return nil
 }
 
+func (t *ReduceTask) RunTask(ctx context.Context, worker *workerpb.WorkerClient, service *Service) {
+	log.Printf("Assigning reduce task %d to worker %v", t.id, worker)
+	service.workers[worker] = false
+	t.worker = worker
+	t.state = Assigned
+	inputFiles := t.inputFiles
+	outputFile := t.outputFile
+	service.mx.Unlock()
+	go func() {
+		_, err := (*worker).Reduce(ctx, &workerpb.ReduceRequest{
+			IntermediateFiles: inputFiles,
+			OutputFile:        outputFile,
+		})
+		if err != nil {
+			log.Printf("Error while processing reduce task: %v", err)
+		}
+		log.Printf("Worker completed reduce task %d", t.id)
+		service.mx.Lock()
+		t.state = Completed
+		service.workers[worker] = true
+		service.reduceTaskToProcess--
+		//s.reduceResults <- res
+		service.mx.Unlock()
+		log.Printf("Reduce task %d done", t.id)
+	}()
+}
+
+func (t *MapTask) RunTask(ctx context.Context, worker *workerpb.WorkerClient, service *Service) {
+	log.Printf("Assigning map task %d to worker %v", t.id, worker)
+	service.workers[worker] = false
+	t.worker = worker
+	t.state = Assigned
+	inputFile := t.inputFile
+	intermediateDir := t.intermediateDir
+	service.mx.Unlock()
+	go func() {
+		_, err := (*worker).Map(ctx, &workerpb.MapRequest{
+			InputFile:       inputFile,
+			IntermediateDir: intermediateDir,
+			NumPartitions:   service.numberOfPartitions,
+		})
+		if err != nil {
+			log.Printf("Error while processing map task: %v", err)
+		}
+		log.Printf("Worker completed map task %d", t.id)
+		service.mx.Lock()
+		t.state = Completed
+		service.mapTaskToProcess--
+		service.workers[worker] = true
+		//s.mapResults <- res
+		service.mx.Unlock()
+		log.Printf("Map task %d done", t.id)
+	}()
+}
+
+func (s *Service) assignTaskToWorker(ctx context.Context, task RunnableTask) {
+	for worker := range s.workers {
+		s.mx.Lock()
+		available := s.workers[worker]
+		if available {
+			task.RunTask(ctx, worker, s)
+			break
+		} else {
+			s.mx.Unlock()
+		}
+	}
+}
+
 func (s *Service) processReduceTasks(ctx context.Context) {
 	log.Printf("Processing reduce tasks")
 	for s.reduceTaskToProcess > 0 {
@@ -186,45 +208,30 @@ func (s *Service) processReduceTasks(ctx context.Context) {
 			task := s.reduceTasks[idx]
 			if task.state == NotAssigned {
 				s.mx.Unlock()
-				for worker := range s.workers {
-					s.mx.Lock()
-					available := s.workers[worker]
-					if available {
-						log.Printf("Assigning reduce task %d to worker %v", task.id, worker)
-						s.workers[worker] = false
-						task.worker = worker
-						task.state = Assigned
-						inputFiles := task.inputFiles
-						outputFile := task.outputFile
-						s.mx.Unlock()
-						go func() {
-							_, err := (*worker).Reduce(ctx, &workerpb.ReduceRequest{
-								IntermediateFiles: inputFiles,
-								OutputFile:        outputFile,
-							})
-							if err != nil {
-								log.Printf("Error while processing reduce task: %v", err)
-							}
-							log.Printf("Completed reduce task %d", task.id)
-							s.mx.Lock()
-							log.Printf("2Completed reduce task %d", task.id)
-							task.state = Completed
-							s.workers[worker] = true
-							s.reduceTaskToProcess--
-							//s.reduceResults <- res
-							s.mx.Unlock()
-						}()
-						break
-					} else {
-						s.mx.Unlock()
-					}
-				}
+				s.assignTaskToWorker(ctx, task)
 			} else {
 				s.mx.Unlock()
 			}
 		}
 	}
 	log.Printf("Completed processing reduce tasks")
+}
+
+func (s *Service) processMapTasks(ctx context.Context) {
+	log.Printf("Processing map tasks")
+	for s.mapTaskToProcess > 0 {
+		for idx := range s.mapTasks {
+			s.mx.Lock()
+			task := s.mapTasks[idx]
+			if task.state == NotAssigned {
+				s.mx.Unlock()
+				s.assignTaskToWorker(ctx, task)
+			} else {
+				s.mx.Unlock()
+			}
+		}
+	}
+	log.Printf("Completed processing map tasks")
 }
 
 func NewService() *Service {
@@ -268,13 +275,17 @@ func (s *Service) cleanup() error {
 	return nil
 }
 
-func (s *Service) MapReduce(ctx context.Context, req *masterpb.MapReduceRequest) (*masterpb.MapReduceResponse, error) {
-	log.Printf("Received MapReduce request: %v", req)
+func (s *Service) InitializeMapReduce(req *masterpb.MapReduceRequest) {
 	s.inputDir = req.GetInputDir()
 	s.intermediateDir = req.GetWorkingDir() + intermediateDirName
 	s.outputDir = req.GetWorkingDir() + outputDirName
 	s.numberOfPartitions = numberOfPartitions
 	s.reduceResults = make(chan *workerpb.ReduceResponse, s.numberOfPartitions)
+}
+
+func (s *Service) MapReduce(ctx context.Context, req *masterpb.MapReduceRequest) (*masterpb.MapReduceResponse, error) {
+	log.Printf("Received MapReduce request: %v", req)
+	s.InitializeMapReduce(req)
 
 	err := s.createMapTasks()
 	if err != nil {
@@ -288,11 +299,12 @@ func (s *Service) MapReduce(ctx context.Context, req *masterpb.MapReduceRequest)
 	}
 	s.processReduceTasks(ctx)
 
-	log.Printf("Completed map reduce job")
 	err = s.cleanup()
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("Completed map reduce job")
 	return &masterpb.MapReduceResponse{
 		OutputDir: s.outputDir,
 	}, nil
