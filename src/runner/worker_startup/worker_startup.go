@@ -2,7 +2,6 @@ package worker_startup
 
 import (
 	"context"
-	"github.com/JacquesWhite/MapReduce/worker"
 	"log"
 	"net"
 
@@ -12,6 +11,7 @@ import (
 
 	masterpb "github.com/JacquesWhite/MapReduce/proto/master"
 	workerpb "github.com/JacquesWhite/MapReduce/proto/worker"
+	"github.com/JacquesWhite/MapReduce/worker"
 )
 
 type ContextWorker struct {
@@ -37,19 +37,19 @@ func StartWorkerServer(ctx ContextWorker) {
 
 	serverError := make(chan error)
 
-	// Register Worker with Master on created ServiceWorker
+	// Handle the messages and do the work
 	go func() {
-		// Handle the messages and do the work
 		log.Println("Worker is running on port", ctx.WorkerPort)
 		serverError <- srv.Serve(listener)
 	}()
 
+	// Register Worker with Master on created ServiceWorker
 	go func() {
 		log.Println("Registering Worker with Master")
 		serverError <- sendRegisterRequest(ctx)
 	}()
 
-	// Wait for the Registration to fully be delivered
+	// Handle any errors that may occur on handled channel
 	for {
 		if err := <-serverError; err != nil {
 			log.Fatalf("Failed to register Worker with Master: %v", err)

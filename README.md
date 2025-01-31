@@ -1,2 +1,2 @@
 # MapReduce
-Map Reduce project for **Distributed Computing Infrastructure Engineering** class at University of Warsaw
+Map Reduce project for **Engineering Distributed Infrastructure** class at University of Warsaw

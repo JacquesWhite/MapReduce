@@ -2,10 +2,11 @@ package main
 
 import (
 	"flag"
-	"github.com/JacquesWhite/MapReduce/runner/worker_startup"
-	"github.com/JacquesWhite/MapReduce/worker"
 	"log"
 	"plugin"
+
+	"github.com/JacquesWhite/MapReduce/runner/worker_startup"
+	"github.com/JacquesWhite/MapReduce/worker"
 )
 
 func main() {
