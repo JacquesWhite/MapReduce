@@ -257,6 +257,7 @@ func (s *Service) RegisterWorker(ctx context.Context, req *masterpb.RegisterWork
 	s.mx.Lock()
 	s.workers[&workerClient] = true
 	s.mx.Unlock()
+	log.Printf("Registered successfully worker: %v", req.GetWorkerAddress())
 	return &masterpb.RegisterWorkerResponse{}, nil
 }
 

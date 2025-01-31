@@ -2,13 +2,15 @@ package main
 
 import (
 	"flag"
-	"github.com/JacquesWhite/MapReduce/master"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/reflection"
 	"log"
 	"net"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/reflection"
+
+	"github.com/JacquesWhite/MapReduce/master"
+  
 	masterpb "github.com/JacquesWhite/MapReduce/proto/master"
 )
 
