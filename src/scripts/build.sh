@@ -4,7 +4,7 @@
 current_dir=$(pwd)
 
 # Change to the directory where the script is located
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit
 
 generate_protocol_buffers() {
   mkdir -p ../proto/master
@@ -22,13 +22,32 @@ build_master() {
   go build -o ../bin/master ../runner/master_runner.go
 }
 
+build_worker() {
+  mkdir -p ../bin
+  go build -o ../bin/worker ../runner/worker_runner.go
+}
+
+build_worker_plugin() {
+  mkdir -p ../bin
+  go build -o ../bin/worker_plugin ../worker/plugins/worker-plugin.go
+}
+
+echo "Building the project..."
+echo "Generating protocol buffers..."
 generate_protocol_buffers
 
 # Install dependencies
+echo "Installing dependencies..."
 go mod tidy
 
 # Build the master
+echo "Building the master..."
 build_master
+echo "Building the worker..."
+build_worker
+echo "Building the worker plugin..."
+build_worker_plugin
 
+echo "Finished"
 # Change back to the original directory
-cd ${current_dir}
+cd ${current_dir} || exit
