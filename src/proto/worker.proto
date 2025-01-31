@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package worker;
-option go_package = "./proto/worker";
+option go_package = "github.com/JacquesWhite/MapReduce/proto/worker";
 
 service Worker {
   rpc Map(MapRequest) returns (MapResponse);

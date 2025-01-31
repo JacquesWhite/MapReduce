@@ -285,13 +285,12 @@ func processReduceTask(ctx context.Context, storageClient *storage.Client, task 
 - [ ] **Write the Code:**
     - [x] Loading Map and Reduce functions from plugins.
     - [ ] GCS interaction for reading/writing data.
-    - [ ] Task assignment and tracking logic in the Master.
+    - [x] Task assignment and tracking logic in the Master.
     - [x] Task execution logic in the Workers.
     - [x] Communication between the Master and Workers using RPC.
     - [ ] Error handling (also part of previous tasks).
-    - [ ] Task management (either in-memory or using Pub/Sub).
+    - [x] Task management (either in-memory or using Pub/Sub).
     - [x] Simple Map and Reduce functions for testing ([mit](https://github.com/zhou-yuhan/MIT-6.824-Distributed-Systems/tree/0c95023d5c36e08880c049d5fbb41c60d34e4299/labs/src/mrapps))
-- [ ] move script for proto generation to the right place.
 ## **Considerations:**
 
 * **Error Handling:** Task retries after deadline.
