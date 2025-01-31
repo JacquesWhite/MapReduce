@@ -99,6 +99,8 @@ type Service struct {
 	reduceTasks           []*reduceTask
 	reduceResults         chan *workerpb.ReduceResponse
 	mx                    sync.Mutex
+	// Only one MapReduce job can be processed at a time
+	mr sync.Mutex
 }
 
 func (t *mapTask) CheckState() TaskState {
@@ -528,6 +530,8 @@ func (s *Service) RegisterWorker(ctx context.Context, req *masterpb.RegisterWork
 func (s *Service) MapReduce(ctx context.Context, req *masterpb.MapReduceRequest) (*masterpb.MapReduceResponse, error) {
 	log.Printf("Received MapReduce request: %v", req)
 	logLineSeparator()
+	s.mr.Lock()
+	defer s.mr.Unlock()
 	err := s.initializeMapReduce(req)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Map reduce: failed to initialize map reduce: %v", err)
