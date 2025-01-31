@@ -1,0 +1,1 @@
+gcloud auth application-default login --impersonate-service-account $SERVICE_ACCOUNT

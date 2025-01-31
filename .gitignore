@@ -31,3 +31,7 @@ go.work.sum
 
 # idea
 .idea
+
+# gcloud service account
+deployment/service-account.json
+deployment/ssh_key_setup.log
