@@ -84,7 +84,7 @@ func (s *Service) createMapTasks() error {
 	log.Printf("Creating map tasks")
 
 	for i, file := range files {
-		taskDir := fmt.Sprintf("%s/map_%d/", s.intermediateDir, i)
+		taskDir := fmt.Sprintf("%s/map_%d", s.intermediateDir, i)
 		err = os.MkdirAll(taskDir, os.ModePerm)
 		if err != nil {
 			return status.Errorf(codes.Internal, "Failed to create intermediate directory: %v", err)
@@ -116,7 +116,7 @@ func (s *Service) createReduceTasks() error {
 	for i := 0; i < int(s.numberOfPartitions); i++ {
 		inputFiles := make([]string, 0)
 		for _, task := range s.mapTasks {
-			inputFiles = append(inputFiles, fmt.Sprintf("%s/%d", task.intermediateDir, i))
+			inputFiles = append(inputFiles, fmt.Sprintf("%s/intermediate-%d", task.intermediateDir, i))
 		}
 		s.reduceTasks = append(s.reduceTasks, &ReduceTask{
 			id:         i,
