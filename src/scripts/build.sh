@@ -27,11 +27,6 @@ build_worker() {
   go build -o ../bin/worker ../runner/worker_runner.go
 }
 
-build_fake_worker() {
-  mkdir -p ../bin
-  go build -o ../bin/fake_worker ../runner/fake_worker_runner.go
-}
-
 build_worker_plugin() {
   mkdir -p ../bin
   go build -buildmode=plugin -o ../bin/worker_plugin.so ../worker/plugins/worker-plugin.go
@@ -50,8 +45,6 @@ echo "Building the master..."
 build_master
 echo "Building the worker..."
 build_worker
-echo "Building the fake worker..."
-build_fake_worker
 echo "Building the worker plugin..."
 build_worker_plugin
 
