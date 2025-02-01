@@ -32,16 +32,6 @@ build_worker_plugin() {
   go build -buildmode=plugin -o ../bin/"$1" "$2"
 }
 
-build_worker_plugin_wordcount() {
-  mkdir -p ../bin
-  go build -buildmode=plugin -o ../bin/worker_plugin.so ../worker/plugins/wordcount/worker-plugin-wordcount.go
-}
-
-build_worker_plugin_crash() {
-  mkdir -p ../bin
-  go build -buildmode=plugin -o ../bin/worker_plugin.so ../worker/plugins/always-crash/worker-plugin-always-crash.go
-}
-
 echo "Building the project..."
 echo "Generating protocol buffers..."
 generate_protocol_buffers
