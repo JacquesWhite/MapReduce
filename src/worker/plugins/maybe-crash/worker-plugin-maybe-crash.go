@@ -28,7 +28,7 @@ func maybeCrash() {
 		// For generated 0 and 1 -> crash
 		os.Exit(1)
 	} else {
-		// For generated 2, 3, 4 -> sleep
+		// For generated [2..10] -> sleep
 		time.Sleep(time.Duration(gen) * time.Second)
 	}
 }
