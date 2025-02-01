@@ -13,17 +13,22 @@ message MapRequest {
   string input_file = 1;
   string intermediate_dir = 2;
   int32 num_partitions = 3;
+  int32 task_id = 4;
 }
 
 message MapResponse {
+  int32 task_id = 1;
+  repeated string intermediate_files = 2;
 }
 
 message ReduceRequest {
-  repeated string intermediate_files = 1;
-  string output_file = 2;
+  int32 task_id = 1;
+  repeated string intermediate_files = 2;
+  string output_file = 3;
 }
 
 message ReduceResponse {
+  int32 task_id = 1;
 }
 
 message CheckStatusRequest {

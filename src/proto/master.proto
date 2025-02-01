@@ -23,8 +23,9 @@ message RegisterWorkerResponse {
 message MapReduceRequest {
   string input_dir = 1;
   string working_dir = 2;
+  int32 num_partitions = 3;
 }
 
 message MapReduceResponse {
-  string output_dir = 1;
+  repeated string output_files = 1;
 }

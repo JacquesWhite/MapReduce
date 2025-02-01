@@ -39,7 +39,7 @@ func IsSeparator(char int32) bool {
 	return !unicode.IsLetter(char) && !(char == '-')
 }
 
-func ihashIdx(key string, nParts int32) int32 {
+func hashIdx(key string, nParts int32) int32 {
 	// Function to choose the bucket number in which the KeyValue will be emitted.
 	h := fnv.New32a()
 	_, err := h.Write([]byte(key))
@@ -66,39 +66,47 @@ func NewWorkerService(m MapFuncT, r ReduceFuncT) *ServiceWorker {
 	}
 }
 
-func (w *ServiceWorker) Map(_ context.Context, request *workerpb.MapRequest) (*workerpb.MapResponse, error) {
-	log.Println("Map request received with file:", request.GetInputFile(), "and intermediate directory:", request.GetIntermediateDir())
+func (w *ServiceWorker) changeStatus(status workerpb.CheckStatusResponse_Status) {
 	w.statusMx.Lock()
-	w.status = workerpb.CheckStatusResponse_BUSY
+	w.status = status
 	w.statusMx.Unlock()
+}
 
+func (w *ServiceWorker) readMapInput(intermediateDir, inputFile string) ([]byte, error) {
 	log.Println("Checking for Directory existence, if not creating it")
-	err := os.MkdirAll(request.GetIntermediateDir(), os.ModePerm)
+	err := os.MkdirAll(intermediateDir, os.ModePerm)
 	if os.IsExist(err) {
-		log.Println("The directory named ", request.GetIntermediateDir(), " exists, nothing created")
+		log.Println("The directory named ", intermediateDir, " exists, nothing created")
 	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Map: error creating directory: %v", err)
 	}
 
-	content, err := os.ReadFile(request.GetInputFile())
+	content, err := os.ReadFile(inputFile)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Map: error reading file: %v", err)
 	}
+	return content, nil
+}
 
-	log.Println("Invoking Map function on file contents")
-	mapRes := w.mapFunc(request.GetInputFile(), string(content))
-	kvAll := make([][]KeyValue, request.GetNumPartitions())
+func (w *ServiceWorker) mapResultsToPartitions(mapRes []KeyValue, nPartitions int32) [][]KeyValue {
+	kvAll := make([][]KeyValue, nPartitions)
 
 	// Map the results to the partitions (Map mapFunction results into nPartitions buckets)
 	for _, kv := range mapRes {
-		idx := ihashIdx(kv.Key, request.GetNumPartitions())
+		idx := hashIdx(kv.Key, nPartitions)
 		kvAll[idx] = append(kvAll[idx], kv)
 	}
 
-	// Write the partitioned results to the intermediate files
+	return kvAll
+}
+
+func (w *ServiceWorker) saveMapOutput(kvAll [][]KeyValue, intermediateDir string) ([]string, error) {
+	partitions := make([]string, len(kvAll))
 	for i, kvs := range kvAll {
-		f, err := os.Create(request.GetIntermediateDir() + "/intermediate-" + strconv.Itoa(i))
+		filepath := intermediateDir + "/intermediate-" + strconv.Itoa(i)
+		partitions[i] = filepath
+		f, err := os.Create(filepath)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Map: error creating intermediate file: %v", err)
 		}
@@ -115,24 +123,12 @@ func (w *ServiceWorker) Map(_ context.Context, request *workerpb.MapRequest) (*w
 			return nil, status.Errorf(codes.Internal, "Map: error closing intermediate file: %v", err)
 		}
 	}
-
-	w.statusMx.Lock()
-	w.status = workerpb.CheckStatusResponse_IDLE
-	w.statusMx.Unlock()
-	log.Println("Map finished")
-
-	return &workerpb.MapResponse{}, nil
+	return partitions, nil
 }
 
-func (w *ServiceWorker) Reduce(_ context.Context, request *workerpb.ReduceRequest) (*workerpb.ReduceResponse, error) {
-	log.Println("Reduce request received with output file:", request.GetOutputFile())
-	w.statusMx.Lock()
-	w.status = workerpb.CheckStatusResponse_BUSY
-	w.statusMx.Unlock()
-
-	// Read all files with intermediate output from Maps
+func (w *ServiceWorker) readReduceInput(files []string) ([]KeyValue, error) {
 	var intermediate []KeyValue
-	for _, file := range request.GetIntermediateFiles() {
+	for _, file := range files {
 		content, err := os.ReadFile(file)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Reduce: error reading file: %v", err)
@@ -151,13 +147,10 @@ func (w *ServiceWorker) Reduce(_ context.Context, request *workerpb.ReduceReques
 	log.Println("Sorting intermediate results")
 	sort.Sort(ByKey(intermediate))
 
-	log.Println("Create the output file (if exists, truncate it)")
-	outFile, err := os.Create(request.GetOutputFile())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Reduce: error creating output file: %v", err)
-	}
+	return intermediate, nil
+}
 
-	// Reduce the values with the same key and write them to the output file
+func (w *ServiceWorker) processReduce(intermediate []KeyValue, outFile *os.File) error {
 	i := 0
 	for i < len(intermediate) {
 		j := i + 1
@@ -173,18 +166,68 @@ func (w *ServiceWorker) Reduce(_ context.Context, request *workerpb.ReduceReques
 		output := w.reduceFunc(intermediate[i].Key, values)
 		_, err := outFile.WriteString(intermediate[i].Key + " " + output + "\n")
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Reduce: error writing to output file: %v", err)
+			return status.Errorf(codes.Internal, "Reduce: error writing to output file: %v", err)
 		}
 
 		i = j
 	}
+	return nil
+}
 
-	w.statusMx.Lock()
-	w.status = workerpb.CheckStatusResponse_IDLE
-	w.statusMx.Unlock()
+func (w *ServiceWorker) Map(_ context.Context, request *workerpb.MapRequest) (*workerpb.MapResponse, error) {
+	log.Println("Map request received with file:", request.GetInputFile(), "and intermediate directory:", request.GetIntermediateDir())
+	w.changeStatus(workerpb.CheckStatusResponse_BUSY)
+
+	content, err := w.readMapInput(request.GetIntermediateDir(), request.GetInputFile())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Map: error reading file: %v", err)
+	}
+
+	log.Println("Invoking Map function on file contents")
+	mapRes := w.mapFunc(request.GetInputFile(), string(content))
+
+	kvAll := w.mapResultsToPartitions(mapRes, request.GetNumPartitions())
+
+	// Write the partitioned results to the intermediate files
+	partitions, err := w.saveMapOutput(kvAll, request.GetIntermediateDir())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Map: error saving map intermediate output: %v", err)
+	}
+
+	w.changeStatus(workerpb.CheckStatusResponse_COMPLETED)
+	log.Println("Map finished")
+
+	return &workerpb.MapResponse{
+		TaskId:            request.GetTaskId(),
+		IntermediateFiles: partitions,
+	}, nil
+}
+
+func (w *ServiceWorker) Reduce(_ context.Context, request *workerpb.ReduceRequest) (*workerpb.ReduceResponse, error) {
+	log.Println("Reduce request received with output file:", request.GetOutputFile())
+	w.changeStatus(workerpb.CheckStatusResponse_BUSY)
+
+	// Read all files with intermediate output from Maps
+	intermediate, err := w.readReduceInput(request.GetIntermediateFiles())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Reduce: error reading intermediate files: %v", err)
+	}
+
+	log.Println("Create the output file (if exists, truncate it)")
+	outFile, err := os.Create(request.GetOutputFile())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Reduce: error creating output file: %v", err)
+	}
+
+	// Reduce the values with the same key and write them to the output file
+	err = w.processReduce(intermediate, outFile)
+
+	w.changeStatus(workerpb.CheckStatusResponse_COMPLETED)
 	log.Println("Reduce request finished")
 
-	return &workerpb.ReduceResponse{}, nil
+	return &workerpb.ReduceResponse{
+		TaskId: request.GetTaskId(),
+	}, nil
 }
 
 func (w *ServiceWorker) CheckStatus(_ context.Context, _ *workerpb.CheckStatusRequest) (*workerpb.CheckStatusResponse, error) {
@@ -192,6 +235,11 @@ func (w *ServiceWorker) CheckStatus(_ context.Context, _ *workerpb.CheckStatusRe
 
 	w.statusMx.Lock()
 	workerStatus := w.status
+	log.Printf("Worker status: %v\n", workerStatus)
+	// Masters collects the status, so we can reset it to IDLE
+	if workerStatus == workerpb.CheckStatusResponse_COMPLETED {
+		w.status = workerpb.CheckStatusResponse_IDLE
+	}
 	w.statusMx.Unlock()
 	log.Println("CheckStatus request finished")
 

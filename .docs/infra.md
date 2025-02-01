@@ -288,7 +288,7 @@ func processReduceTask(ctx context.Context, storageClient *storage.Client, task 
     - [x] Task assignment and tracking logic in the Master.
     - [x] Task execution logic in the Workers.
     - [x] Communication between the Master and Workers using RPC.
-    - [ ] Error handling (also part of previous tasks).
+    - [x] Error handling (also part of previous tasks).
     - [x] Task management (either in-memory or using Pub/Sub).
     - [x] Simple Map and Reduce functions for testing ([mit](https://github.com/zhou-yuhan/MIT-6.824-Distributed-Systems/tree/0c95023d5c36e08880c049d5fbb41c60d34e4299/labs/src/mrapps))
 ## **Considerations:**
