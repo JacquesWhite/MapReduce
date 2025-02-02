@@ -29,7 +29,7 @@ build_worker() {
 
 build_worker_plugin() {
   mkdir -p ../bin
-  go build -buildmode=plugin -o ../bin/worker_plugin.so ../worker/plugins/worker-plugin.go
+  go build -buildmode=plugin -o ../bin/"$1" "$2"
 }
 
 echo "Building the project..."
@@ -45,8 +45,14 @@ echo "Building the master..."
 build_master
 echo "Building the worker..."
 build_worker
-echo "Building the worker plugin..."
-build_worker_plugin
+
+echo "Building the worker plugins..."
+echo "Building the wordcount_plugin..."
+build_worker_plugin wordcount_plugin.so ../worker/plugins/wordcount/worker-plugin-wordcount.go
+echo "Building the always_crash_plugin..."
+build_worker_plugin alwyas_crash_plugin.so ../worker/plugins/always-crash/worker-plugin-always-crash.go
+echo "Building the maybe_crash_plugin..."
+build_worker_plugin maybe_crash_plugin.so ../worker/plugins/maybe-crash/worker-plugin-maybe-crash.go
 
 echo "Finished"
 # Change back to the original directory
