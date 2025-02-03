@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: filestore-pv
+spec:
+  capacity:
+    storage: 1Ti
+  accessModes:
+    - ReadWriteMany  # Allows multiple pods (workers + master) to share storage
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: filestore-map-reduce
+  mountOptions:
+    - nconnect=8  # Optimizes performance
+    - hard
+    - nolock
+  nfs:
+    path: /mapreduceshare  # Must match Filestore --file-share name
+    server: 10.27.27.218  # Replace with actual NFS IP

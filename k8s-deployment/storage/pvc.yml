@@ -1,0 +1,11 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: mapreduce-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: filestore-map-reduce
+  resources:
+    requests:
+      storage: 15Gi
