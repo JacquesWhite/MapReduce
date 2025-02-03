@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mapreduce-upload
+spec:
+  serviceName: "mapreduce-upload"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mapreduce-upload
+  template:
+    metadata:
+      labels:
+        app: mapreduce-upload
+    spec:
+      containers:
+        - name: upload
+          image: $REGION-docker.pkg.dev/mapreduce-449700/map-reduce/upload:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            - name: MASTER_ADDRESS
+              value: "mapreduce-master-0.mapreduce-master.default.svc.cluster.local"
+            - name: MASTER_PORT
+              value: "50000"
+            - name: SHARED_DIR
+              value: "/mapreduce/data"
+          volumeMounts:
+            - name: mapreduce-pvc
+              mountPath: /mapreduce
+      volumes:
+        - name: mapreduce-pvc
+          persistentVolumeClaim:
+            claimName: mapreduce-pvc

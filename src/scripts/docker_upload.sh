@@ -24,13 +24,20 @@ gcloud auth configure-docker $REGION-docker.pkg.dev
 docker build -t master -f docker/master/Dockerfile .
 docker build -t worker -f docker/worker/Dockerfile .
 
+cd src/upload
+docker build -t upload -f Dockerfile .
+cd ../../
+
 MASTER_TAG=$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY_NAME/$MASTER_IMAGE_NAME:$VERSION
 WORKER_TAG=$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY_NAME/$WORKER_IMAGE_NAME:$VERSION
+UPLOAD_TAG=$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY_NAME/upload:$VERSION
 
 docker tag master "$MASTER_TAG"
 docker tag worker "$WORKER_TAG"
+docker tag upload "$UPLOAD_TAG"
 
 docker push "$MASTER_TAG"
 docker push "$WORKER_TAG"
+docker push "$UPLOAD_TAG"
 
 cd $current_dir || exit

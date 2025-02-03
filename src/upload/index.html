@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>File Upload</title>
+</head>
+<body>
+    <h1>Upload Files</h1>
+    <form action="/upload/" method="post" enctype="multipart/form-data">
+        <label for="subdirectory">Subdirectory:</label>
+        <input type="text" name="subdirectory" id="subdirectory">
+        <br><br>
+        <input type="file" name="files" multiple>
+        <input type="submit" value="Upload">
+    </form>
+    <h2>Download Subdirectories</h2>
+    <div id="file-list">
+        <!-- File list will be populated here -->
+    </div>
+    <h2>MapReduce</h2>
+    <form action="/mapreduce/" method="post">
+        <label for="mapreduce-subdirectory">Subdirectory:</label>
+        <input type="text" name="subdirectory" id="mapreduce-subdirectory">
+        <br><br>
+        <label for="num-partitions">Number of Partitions:</label>
+        <input type="number" name="num_partitions" id="num-partitions" min="1" value="1">
+        <br><br>
+        <input type="submit" value="Run MapReduce">
+    </form>
+    <script>
+        async function fetchFiles() {
+            const response = await fetch('/files');
+            const subdirectories = await response.json();
+            const fileList = document.getElementById('file-list');
+            fileList.innerHTML = '';
+            subdirectories.forEach(subdirectory => {
+                const link = document.createElement('a');
+                link.href = `/download/${subdirectory}`;
+                link.textContent = subdirectory;
+                fileList.appendChild(link);
+                fileList.appendChild(document.createElement('br'));
+            });
+        }
+        fetchFiles();
+    </script>
+</body>
+</html>
