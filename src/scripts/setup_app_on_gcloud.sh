@@ -26,5 +26,7 @@ kubectl create -f ./../../k8s-deployment/storage/pvc.yml
 envsubst < ./../../k8s-deployment/master-service.yml | kubectl apply -f -
 envsubst < ./../../k8s-deployment/master-statefulset.yml | kubectl apply -f -
 envsubst < ./../../k8s-deployment/worker-deployment.yml | kubectl apply -f -
+envsubst < ./../../k8s-deployment/upload-service.yml | kubectl apply -f -
+envsubst < ./../../k8s-deployment/upload-statefulset.yml | kubectl apply -f -
 
 cd $current_dir || exit
