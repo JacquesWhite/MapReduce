@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mapreduce-master
+spec:
+  serviceName: "mapreduce-master"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mapreduce-master
+  template:
+    metadata:
+      labels:
+        app: mapreduce-master
+    spec:
+      containers:
+        - name: master
+          image: $REGION-docker.pkg.dev/mapreduce-449700/map-reduce/master:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 50000
+          env:
+            - name: PORT
+              value: "50000"
+          volumeMounts:
+            - name: mapreduce-pvc
+              mountPath: /mapreduce
+      volumes:
+        - name: mapreduce-pvc
+          persistentVolumeClaim:
+            claimName: mapreduce-pvc
