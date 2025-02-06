@@ -3,7 +3,6 @@ package master
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"time"
@@ -12,6 +11,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+
+	"github.com/rs/zerolog/log"
 
 	masterpb "github.com/JacquesWhite/MapReduce/proto/master"
 	workerpb "github.com/JacquesWhite/MapReduce/proto/worker"
@@ -151,9 +152,9 @@ func createWorkerClient(workerAddress *masterpb.WorkerAddress) (workerpb.WorkerC
 func (s *Service) createMapTasks() error {
 	files, err := os.ReadDir(s.inputDir)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Failed to read input directory")
 	}
-	log.Printf("Creating map tasks")
+	log.Info().Msg("Creating map tasks")
 
 	for i, file := range files {
 		taskDir := fmt.Sprintf("%s/map_%d", s.intermediateDir, i)
@@ -168,12 +169,12 @@ func (s *Service) createMapTasks() error {
 			intermediateDir: taskDir,
 			state:           NotAssigned,
 		})
-		log.Printf("Created map task: %v", s.mapTasks[i])
+		log.Info().Msgf("Created map task: %v", s.mapTasks[i])
 	}
 	s.mapTaskToProcess = len(s.mapTasks)
 	s.unprocessedMapResults = len(s.mapTasks)
 	s.mapResults = make(chan *workerpb.MapResponse, len(s.mapTasks))
-	log.Printf("Created map tasks")
+	log.Info().Msg("Created map tasks")
 	return nil
 }
 
@@ -181,10 +182,10 @@ func (s *Service) prepareReduceInputFiles() [][]string {
 	inputFiles := make([][]string, s.numberOfPartitions)
 	for s.unprocessedMapResults > 0 {
 		res := <-s.mapResults
-		log.Printf("Processing map result: %v", res)
-		log.Printf("Task id: %d, ended with status: %s", res.GetTaskId(), s.mapTasks[res.GetTaskId()].CheckState().String())
+		log.Info().Msgf("Processing map result: %v", res)
+		log.Info().Msgf("Task id: %d, ended with status: %s", res.GetTaskId(), s.mapTasks[res.GetTaskId()].CheckState().String())
 		if s.mapTasks[res.GetTaskId()].CheckState() != Completed {
-			log.Printf("Map task %d has not been completed", res.GetTaskId())
+			log.Info().Msgf("Map task %d has not been completed", res.GetTaskId())
 			continue
 		}
 		for partition, file := range res.GetIntermediateFiles() {
@@ -196,27 +197,27 @@ func (s *Service) prepareReduceInputFiles() [][]string {
 }
 
 func (s *Service) prepareResponse() (*masterpb.MapReduceResponse, error) {
-	log.Printf("Preparing response")
+	log.Info().Msg("Preparing response")
 	outputFiles := make([]string, s.numberOfPartitions)
 	filledOutputFiles := 0
 	for filledOutputFiles != int(s.numberOfPartitions) {
 		res := <-s.reduceResults
-		log.Printf("Processing reduce result: %v", res)
-		log.Printf("Task id: %d, ended with status: %s", res.GetTaskId(), s.reduceTasks[res.GetTaskId()].CheckState().String())
+		log.Info().Msgf("Processing reduce result: %v", res)
+		log.Info().Msgf("Task id: %d, ended with status: %s", res.GetTaskId(), s.reduceTasks[res.GetTaskId()].CheckState().String())
 		if s.reduceTasks[res.GetTaskId()].CheckState() != Completed {
 			continue
 		}
 		outputFiles[res.GetTaskId()] = s.reduceTasks[res.GetTaskId()].outputFile
 		filledOutputFiles++
 	}
-	log.Printf("Prepared response")
+	log.Info().Msg("Prepared response")
 	return &masterpb.MapReduceResponse{
 		OutputFiles: outputFiles,
 	}, nil
 }
 
 func (s *Service) createReduceTasks() error {
-	log.Printf("Creating reduce tasks")
+	log.Info().Msg("Creating reduce tasks")
 	if s.mapTaskToProcess != 0 {
 		return status.Errorf(codes.Internal, "All map tasks should have been processed before creating reduce tasks")
 	}
@@ -224,9 +225,9 @@ func (s *Service) createReduceTasks() error {
 	if err != nil {
 		return status.Errorf(codes.Internal, "Failed to create intermediate directory: %v", err)
 	}
-	log.Printf("Preparing reduce input files")
+	log.Info().Msg("Preparing reduce input files")
 	inputFiles := s.prepareReduceInputFiles()
-	log.Printf("Prepared reduce input files")
+	log.Info().Msg("Prepared reduce input files")
 	for i := 0; i < int(s.numberOfPartitions); i++ {
 		s.reduceTasks = append(s.reduceTasks, &reduceTask{
 			id:         i,
@@ -235,15 +236,15 @@ func (s *Service) createReduceTasks() error {
 			outputFile: fmt.Sprintf("%s/%d", s.outputDir, i),
 			state:      NotAssigned,
 		})
-		log.Printf("Created reduce task: %v", s.reduceTasks[i])
+		log.Info().Msgf("Created reduce task: %v", s.reduceTasks[i])
 	}
-	log.Printf("Created reduce tasks")
+	log.Info().Msg("Created reduce tasks")
 	s.reduceTaskToProcess = len(s.reduceTasks)
 	return nil
 }
 
 func (t *reduceTask) RunTask(ctx context.Context, worker *workerpb.WorkerClient, service *Service) {
-	log.Printf("Assigning reduce task %d to worker %v", t.id, worker)
+	log.Info().Msgf("Assigning reduce task %d to worker %v", t.id, worker)
 	service.workers[worker] = false
 	t.worker = worker
 	t.state = Assigned
@@ -256,15 +257,15 @@ func (t *reduceTask) RunTask(ctx context.Context, worker *workerpb.WorkerClient,
 			TaskId:            int32(t.id),
 		})
 		if err != nil {
-			log.Printf("ROUTINE: Error while processing reduce task: %v", err)
+			log.Err(err).Msgf("ROUTINE: Error while processing reduce task: %v", err)
 		}
 		service.reduceResults <- res
-		log.Printf("ROUTINE: Worker completed reduce task %d", t.id)
+		log.Info().Msgf("ROUTINE: Worker completed reduce task %d", t.id)
 	}()
 }
 
 func (t *mapTask) RunTask(ctx context.Context, worker *workerpb.WorkerClient, service *Service) {
-	log.Printf("Assigning map task %d to worker %v", t.id, worker)
+	log.Info().Msgf("Assigning map task %d to worker %v", t.id, worker)
 	service.workers[worker] = false
 	t.worker = worker
 	t.ChangeState(Assigned)
@@ -278,10 +279,10 @@ func (t *mapTask) RunTask(ctx context.Context, worker *workerpb.WorkerClient, se
 			TaskId:          int32(t.id),
 		})
 		if err != nil {
-			log.Printf("ROUTINE: Error while processing map task: %v", err)
+			log.Err(err).Msgf("ROUTINE: Error while processing map task: %v", err)
 		}
 		service.mapResults <- res
-		log.Printf("ROUTINE: Worker completed map task %d", t.id)
+		log.Info().Msgf("ROUTINE: Worker completed map task %d", t.id)
 	}()
 }
 
@@ -290,7 +291,7 @@ func checkWorkerStatus(ctx context.Context, worker *workerpb.WorkerClient, taskI
 	defer cancel()
 	res, err := (*worker).CheckStatus(ctxWithTimeout, &workerpb.CheckStatusRequest{})
 	if err != nil {
-		log.Printf("Error while checking worker status, for task_id %d: %v", taskId, err)
+		log.Err(err).Msgf("Error while checking worker status, for task_id %d: %v", taskId, err)
 		return Failure
 	}
 	if res.GetStatus() == workerpb.CheckStatusResponse_IDLE {
@@ -348,20 +349,20 @@ func (s *Service) monitorTaskExecution(ctx context.Context, idx int, task Runnab
 		case *mapTask:
 			err := s.createMapTaskCopy(idx)
 			if err != nil {
-				log.Printf("Monitor map task execution error while creating map task copy: %v", err)
+				log.Err(err).Msgf("Monitor map task execution error while creating map task copy: %v", err)
 				return err
 			}
 		case *reduceTask:
 			err := s.createReduceTaskCopy(idx)
 			if err != nil {
-				log.Printf("Monitor map task execution error while creating reduce task copy: %v", err)
+				log.Err(err).Msgf("Monitor map task execution error while creating reduce task copy: %v", err)
 				return err
 			}
 		}
 	case Idle, Processing:
 		//	Worker is processing the task - come back later
 	case Done:
-		log.Printf("Master noticed that worker has completed task %d", task.CheckId())
+		log.Info().Msgf("Master noticed that worker has completed task %d", task.CheckId())
 		task.ChangeState(Completed)
 		switch task.(type) {
 		case *mapTask:
@@ -391,7 +392,7 @@ func (s *Service) assignTaskToWorker(ctx context.Context, task RunnableTask) {
 }
 
 func (s *Service) processReduceTasks(ctx context.Context) error {
-	log.Printf("Processing reduce tasks")
+	log.Info().Msg("Processing reduce tasks")
 	for s.reduceTaskToProcess > 0 {
 		numberOfTasks := len(s.reduceTasks)
 		for idx := range numberOfTasks {
@@ -406,12 +407,12 @@ func (s *Service) processReduceTasks(ctx context.Context) error {
 			}
 		}
 	}
-	log.Printf("Completed processing reduce tasks")
+	log.Info().Msg("Completed processing reduce tasks")
 	return nil
 }
 
 func (s *Service) processMapTasks(ctx context.Context) error {
-	log.Printf("Processing map tasks")
+	log.Info().Msg("Processing map tasks")
 	for s.mapTaskToProcess > 0 {
 		numberOfTasks := len(s.mapTasks)
 		for idx := range numberOfTasks {
@@ -426,7 +427,7 @@ func (s *Service) processMapTasks(ctx context.Context) error {
 			}
 		}
 	}
-	log.Printf("Completed processing map tasks")
+	log.Info().Msg("Completed processing map tasks")
 	return nil
 }
 
@@ -437,9 +438,10 @@ func NewService() *Service {
 }
 
 func (s *Service) cleanup() error {
-	log.Printf("Cleaning up")
+	log.Info().Msg("Cleaning up")
 	err := os.RemoveAll(s.intermediateDir)
 	if err != nil {
+		log.Err(err).Msgf("Failed to remove intermediate directory: %v", err)
 		return err
 	}
 	s.mapTasks = nil
@@ -464,13 +466,13 @@ func (s *Service) initializeMapReduce(req *masterpb.MapReduceRequest) error {
 }
 
 func (s *Service) RegisterWorker(ctx context.Context, req *masterpb.RegisterWorkerRequest) (*masterpb.RegisterWorkerResponse, error) {
-	log.Printf("Received RegisterWorkers request: %v", req)
+	log.Info().Msgf("Received RegisterWorkers request: %v", req)
 	address := req.GetWorkerAddress().GetIp() + ":" + req.GetWorkerAddress().GetPort()
 	s.mx.Lock()
 	addressAlreadyExists := s.registeredAddress[address]
 	s.mx.Unlock()
 	if addressAlreadyExists {
-		log.Printf("Worker already registered, no need to create new connection: %v", req.GetWorkerAddress())
+		log.Info().Msgf("Worker already registered, no need to create new connection: %v", req.GetWorkerAddress())
 		return &masterpb.RegisterWorkerResponse{}, nil
 	}
 	workerClient, err := createWorkerClient(req.GetWorkerAddress())
@@ -488,12 +490,12 @@ func (s *Service) RegisterWorker(ctx context.Context, req *masterpb.RegisterWork
 	s.mx.Lock()
 	s.workers[&workerClient] = true
 	s.mx.Unlock()
-	log.Printf("Registered successfully worker: %v", req.GetWorkerAddress())
+	log.Info().Msgf("Registered successfully worker: %v", req.GetWorkerAddress())
 	return &masterpb.RegisterWorkerResponse{}, nil
 }
 
 func (s *Service) MapReduce(ctx context.Context, req *masterpb.MapReduceRequest) (*masterpb.MapReduceResponse, error) {
-	log.Printf("Received MapReduce request: %v", req)
+	log.Info().Msgf("Received MapReduce request: %v", req)
 	s.mr.Lock()
 	defer s.mr.Unlock()
 	logLineSeparator()
@@ -537,7 +539,7 @@ func (s *Service) MapReduce(ctx context.Context, req *masterpb.MapReduceRequest)
 		return nil, err
 	}
 
-	log.Printf("Completed map reduce job")
+	log.Info().Msg("Map reduce job completed")
 	logLineSeparator()
 	return res, nil
 }

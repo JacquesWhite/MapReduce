@@ -2,16 +2,17 @@ package worker_startup
 
 import (
 	"context"
-	"log"
 	"net"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/JacquesWhite/MapReduce/worker"
+	"github.com/rs/zerolog/log"
+
 	masterpb "github.com/JacquesWhite/MapReduce/proto/master"
 	workerpb "github.com/JacquesWhite/MapReduce/proto/worker"
-	"github.com/JacquesWhite/MapReduce/worker"
 )
 
 type ContextWorker struct {
@@ -27,7 +28,7 @@ func StartWorkerServer(ctx ContextWorker) {
 	// Start server first, as it takes a second to boot up
 	listener, err := net.Listen("tcp", ":"+ctx.WorkerPort)
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("Failed to listen on Worker port")
 	}
 
 	srv := grpc.NewServer()
@@ -39,20 +40,20 @@ func StartWorkerServer(ctx ContextWorker) {
 
 	// Handle the messages and do the work
 	go func() {
-		log.Println("Worker is running on port", ctx.WorkerPort)
+		log.Info().Msgf("Worker is running on port %s", ctx.WorkerPort)
 		serverError <- srv.Serve(listener)
 	}()
 
 	// Register Worker with Master on created ServiceWorker
 	go func() {
-		log.Println("Registering Worker with Master")
+		log.Info().Msg("Registering Worker with Master")
 		serverError <- sendRegisterRequest(ctx)
 	}()
 
 	// Handle any errors that may occur on handled channel
 	for {
 		if err := <-serverError; err != nil {
-			log.Fatalf("Failed to register Worker with Master: %v", err)
+			log.Fatal().Err(err).Msg("Error occurred on Worker server")
 		}
 	}
 }
@@ -62,7 +63,7 @@ func sendRegisterRequest(ctx ContextWorker) error {
 	addr := ctx.MasterIP + ":" + ctx.MasterPort
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return err
+		log.Fatal().Err(err).Msg("Failed to connect to Master")
 	}
 
 	client := masterpb.NewMasterClient(conn)
@@ -77,6 +78,6 @@ func sendRegisterRequest(ctx ContextWorker) error {
 	}
 
 	_, err = client.RegisterWorker(context.Background(), req)
-	log.Println("Sent RegisterWorker request with Worker info to Master")
+	log.Info().Msg("Sent RegisterWorker request with Worker info to Master")
 	return err
 }

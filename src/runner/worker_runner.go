@@ -2,11 +2,12 @@ package main
 
 import (
 	"flag"
-	"log"
 	"plugin"
 
 	"github.com/JacquesWhite/MapReduce/runner/worker_startup"
 	"github.com/JacquesWhite/MapReduce/worker"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
@@ -15,6 +16,12 @@ func main() {
 	masterPort := flag.String("m_port", "50051", "The master port")
 	masterIP := flag.String("m_ip", "localhost", "The master IP")
 	pluginFile := flag.String("plugin", "", "The plugin file with Map and Reduce functions")
+
+	// Set logging settings
+	zerolog.LevelFieldName = "severity"
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+
+	// Parse the flags
 	flag.Parse()
 
 	mapFunc, reduceFunc := loadPlugin(*pluginFile)
@@ -36,18 +43,18 @@ func main() {
 func loadPlugin(filename string) (worker.MapFuncT, worker.ReduceFuncT) {
 	p, err := plugin.Open(filename)
 	if err != nil {
-		log.Fatalf("cannot load plugin %v", filename)
+		log.Fatal().Err(err).Msgf("cannot load plugin %v", filename)
 	}
 
 	lookupMapFunc, err := p.Lookup("Map")
 	if err != nil {
-		log.Fatalf("cannot find Map function in %v", filename)
+		log.Fatal().Err(err).Msgf("cannot find Map function in %v", filename)
 	}
 	mapFunc := lookupMapFunc.(worker.MapFuncT)
 
 	lookupReduceFunc, err := p.Lookup("Reduce")
 	if err != nil {
-		log.Fatalf("cannot find Reduce in %v", filename)
+		log.Fatal().Err(err).Msgf("cannot find Reduce function in %v", filename)
 	}
 	reduceFunc := lookupReduceFunc.(worker.ReduceFuncT)
 

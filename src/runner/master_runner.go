@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"net"
 
 	"google.golang.org/grpc"
@@ -10,13 +9,19 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/JacquesWhite/MapReduce/master"
-  
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	masterpb "github.com/JacquesWhite/MapReduce/proto/master"
 )
 
 func main() {
 	// Define a flag for the port
 	port := flag.String("port", "50051", "The server port")
+
+	// Set logging settings
+	zerolog.LevelFieldName = "severity"
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	// Parse the flags
 	flag.Parse()
@@ -30,11 +35,11 @@ func main() {
 
 	listener, err := net.Listen("tcp", ":"+*port)
 	if err != nil {
-		log.Fatalf("Failed to listen on port %s: %v", *port, err)
+		log.Fatal().Err(err).Msgf("Failed to listen on port %s", *port)
 	}
 
-	log.Println("Starting gRPC server on port ", *port)
+	log.Info().Msgf("Starting gRPC server on port %s", *port)
 	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("Failed to serve gRPC server: %v", err)
+		log.Fatal().Err(err).Msg("Failed to serve gRPC server")
 	}
 }
