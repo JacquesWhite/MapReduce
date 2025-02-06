@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: master
-          image: $REGION-docker.pkg.dev/mapreduce-449700/map-reduce/master:latest
+          image: ${REGION}-docker.pkg.dev/${PROJECT_ID}/map-reduce/master:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 50000

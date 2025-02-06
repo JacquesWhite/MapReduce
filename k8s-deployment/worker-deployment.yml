@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: worker
-          image: $REGION-docker.pkg.dev/mapreduce-449700/map-reduce/worker:latest
+          image: ${REGION}-docker.pkg.dev/${PROJECT_ID}/map-reduce/worker:latest
           imagePullPolicy: Always
           env:
             - name: MASTER_ADDRESS

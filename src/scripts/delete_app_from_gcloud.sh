@@ -13,6 +13,8 @@ export CLUSTER_NAME=map-reduce-cluster
 export REGION=us-central1
 export REPOSITORY_NAME=map-reduce
 export PROJECT_ID=$(gcloud config get-value project)
+export FILESTORE_NAME=filestore-map-reduce
+export FILESTORE_ZONE=$REGION-a
 
 # Delete the services and deployments
 kubectl delete service mapreduce-master
@@ -23,6 +25,11 @@ kubectl delete deployment mapreduce-workers
 
 # Delete filestore
 kubectl delete pvc mapreduce-pvc
+
+gcloud filestore instances delete $FILESTORE_NAME \
+  --project=$PROJECT_ID \
+  --zone=$FILESTORE_ZONE \
+  --force
 
 # Delete the repository
 gcloud artifacts repositories delete $REPOSITORY_NAME --location=$REGION --project=$PROJECT_ID
