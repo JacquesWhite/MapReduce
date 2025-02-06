@@ -34,7 +34,8 @@ export FILESTORE_IP=$(
   gcloud filestore instances describe $FILESTORE_NAME --zone=$FILESTORE_ZONE --format='value(networks.ipAddresses[0])'
 )
 
-#./docker_upload.sh
+# Optional step, if you want to update the Docker images used by pods
+./docker_upload.sh
 
 # GKE stuff
 kubectl create -f ./../../k8s-deployment/storage/filestore-storageclass.yml
