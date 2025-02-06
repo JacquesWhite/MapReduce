@@ -14,5 +14,5 @@ spec:
     - hard
     - nolock
   nfs:
-    path: /mapreduceshare  # Must match Filestore --file-share name
-    server: 10.27.27.218  # Replace with actual NFS IP
+    path: /$FILESTORE_PATH  # Must match Filestore --file-share name
+    server: $FILESTORE_IP  # Replace with actual NFS IP
