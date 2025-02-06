@@ -6,9 +6,15 @@
     * maybe even in bash.
     * Compiles Map and Reduce functions to go plugins and uploads them to GCS or to worker machines directly (gcloud scp/scp).
     * Uploads input data to GCS.
-    * Executes Master and Worker processes on Google Compute Engine (GCE) instances. (gcloud CLI)
-        **Master input:** input data location, worker ip's, port
-        **Worker input:** master ip, port, function to run
+    * Executes Master and Worker processes on Google Compute Engine (GCE) instances. (gcloud CLI) 
+    * **Master input:**
+      * master_port (to run Master's RPC server)
+    * **Worker input:** 
+      * worker_ip (to pass to master for connection)
+      * worker_port (to run RPC server and pass to master for connection)
+      * master_port (to connect)
+      * master_ip (to connect)
+      * compiled plugin `.so` file (for Map and Reduce functions)
 
 2. **Master Node:**
     * Assigns Map and Reduce tasks to worker nodes.
@@ -16,19 +22,19 @@
     * Handles worker failures (re-assigns tasks after deadline).
 
 3. **Worker Nodes:**
-    * Download/load Map and Reduce functions.
+    * Compile plugins from `plugins/` and load desired plugin to Worker.
     * Execute Map and Reduce tasks assigned by the Master.
-    * Read input data for Map tasks.
-    * Write intermediate data (output of Map, input to Reduce) (localy or GCS?).
-    * Shuffle and sort intermediate data for Reduce tasks.
+    * Read input data for Map tasks (passed by Master).
+    * Write intermediate data (output of Map, input to Reduce) (locally or GCS?).
+    * Map task does the shuffling (grouping into buckets by key) before writing to intermediate file.
     * Write final output data (output of Reduce).
 
 4. **Input Data:**
-    * IMHO text file/file.
+    * Text file from `datasets/` dir.
 
 5. **Intermediate Data:**
     * Key-value pairs produced by the Map tasks.
-    * Sorted/grouped by key before being sent to Reduce tasks.
+    * Grouped by key into specific index file before being sent to Reduce tasks.
 
 6. **Output Data:**
     * Final results produced by the Reduce tasks.
@@ -74,207 +80,6 @@
 |    Google Cloud Storage  |    Google Cloud Storage  |    Google Cloud Storage  | (Buckets)
 |     (Input Data)         |    (Intermediate Data)   |      (Output Data)       |
 +--------------------------+--------------------------+--------------------------+
-```
-
-## Go Implementation Outline **(AI GENERATED BULLSHIT)**
-
-### **[Plugin Loading:](https://github.com/zhou-yuhan/MIT-6.824-Distributed-Systems/blob/0c95023d5c36e08880c049d5fbb41c60d34e4299/labs/src/main/mrworker.go#L34)**
-
-```go
-package main
-
-//
-// start a worker process, which is implemented
-// in ../worker/worker.go. typically there will be
-// multiple worker processes, talking to one master.
-//
-// go run mrworker.go wc.so
-//
-// Please do not change this file.
-//
-
-import "../mr"
-import "plugin"
-import "os"
-import "fmt"
-import "log"
-
-func main() {
- if len(os.Args) != 2 {
-  fmt.Fprintf(os.Stderr, "Usage: mrworker xxx.so\n")
-  os.Exit(1)
- }
-
- mapf, reducef := loadPlugin(os.Args[1])
-
- mr.Worker(mapf, reducef)
-}
-
-//
-// load the application Map and Reduce functions
-// from a plugin file, e.g. ../mrapps/wc.so
-//
-func loadPlugin(filename string) (func(string, string) []mr.KeyValue, func(string, []string) string) {
- p, err := plugin.Open(filename)
- if err != nil {
-  log.Fatalf("cannot load plugin %v", filename)
- }
- xmapf, err := p.Lookup("Map")
- if err != nil {
-  log.Fatalf("cannot find Map in %v", filename)
- }
- mapf := xmapf.(func(string, string) []mr.KeyValue)
- xreducef, err := p.Lookup("Reduce")
- if err != nil {
-  log.Fatalf("cannot find Reduce in %v", filename)
- }
- reducef := xreducef.(func(string, []string) string)
-
- return mapf, reducef
-}
-```
-
-### **Master Node (master.go):**
-
-```go
-package main
-
-import (
- "context"
- "fmt"
- "log"
- "sync"
- "time"
-
- "cloud.google.com/go/pubsub"
- "cloud.google.com/go/storage"
-)
-
-// ... (Define data structures for Tasks, Workers, etc.)
-
-func main() {
- // 1. Initialize GCS client
- ctx := context.Background()
- storageClient, err := storage.NewClient(ctx)
- if err != nil {
-  log.Fatalf("Failed to create storage client: %v", err)
- }
- defer storageClient.Close()
-
- // 2. (Optional) Initialize Pub/Sub client
- pubsubClient, err := pubsub.NewClient(ctx, "gcp-project-id")
- if err != nil {
-  log.Fatalf("Failed to create pubsub client: %v", err)
- }
- defer pubsubClient.Close()
-
- // 3. Read Input Data (split into chunks)
- inputChunks := readInputDataFromGCS(storageClient, "input-bucket", "input-prefix")
-
- // 4. Create Task Queues (either in-memory or Pub/Sub topics)
- mapTasks := make(chan Task, len(inputChunks))
- reduceTasks := make(chan Task, numReducers)
-
- // 5. Start Worker Pool
- var wg sync.WaitGroup
- for i := 0; i < numWorkers; i++ {
-  wg.Add(1)
-  go startWorker(ctx, &wg, i, mapTasks, reduceTasks, storageClient, pubsubClient) // Pass clients
- }
-
- // 6. Assign Map Tasks
- for _, chunk := range inputChunks {
-  mapTasks <- Task{Type: "map", Input: chunk}
- }
-
- // 7. Monitor Task Completion (using channels, Pub/Sub, or a shared data store)
- // ... (Logic to track completed Map tasks and trigger Reduce tasks)
-
- // 8. Assign Reduce Tasks
- // ... (Logic to assign Reduce tasks based on intermediate data locations)
-
- // 9. Wait for all tasks to complete
- close(mapTasks)
- close(reduceTasks)
- wg.Wait()
-
- fmt.Println("MapReduce job completed!")
-}
-
-// ... (Helper functions for reading/writing GCS, managing tasks, etc.)
-```
-
-### **Worker Node (worker.go):**
-
-```go
-package main
-
-import (
- "context"
- "fmt"
- "log"
- "sync"
-
- "cloud.google.com/go/pubsub"
- "cloud.google.com/go/storage"
-)
-
-// ... (Define data structures for Tasks, etc.)
-
-func startWorker(ctx context.Context, wg *sync.WaitGroup, workerID int, mapTasks chan Task, reduceTasks chan Task, storageClient *storage.Client, pubsubClient *pubsub.Client) {
- defer wg.Done()
-
- for {
-  select {
-  case task, ok := <-mapTasks:
-   if !ok {
-    return // Map tasks channel closed
-   }
-   fmt.Printf("Worker %d: Received Map task: %v\n", workerID, task)
-   err := processMapTask(ctx, storageClient, task)
-   if err != nil {
-    log.Printf("Worker %d: Map task failed: %v", workerID, err)
-    // Handle error (e.g., report failure to Master)
-   } else {
-    // Report success to Master (e.g., via Pub/Sub)
-   }
-
-  case task, ok := <-reduceTasks:
-   if !ok {
-    return // Reduce tasks channel closed
-   }
-   fmt.Printf("Worker %d: Received Reduce task: %v\n", workerID, task)
-   err := processReduceTask(ctx, storageClient, task)
-   if err != nil {
-    log.Printf("Worker %d: Reduce task failed: %v", workerID, err)
-    // Handle error
-   } else {
-    // Report success
-   }
-
-  case <-ctx.Done():
-   return // Context canceled (e.g., shutdown signal)
-  }
- }
-}
-
-func processMapTask(ctx context.Context, storageClient *storage.Client, task Task) error {
- // 1. Read input data from GCS (task.Input will contain the chunk location)
- // 2. Perform Map operation (user-defined Map function)
- // 3. Write intermediate data to GCS (partitioned by key for Reduce tasks)
- // ...
- return nil
-}
-
-func processReduceTask(ctx context.Context, storageClient *storage.Client, task Task) error {
- // 1. Read intermediate data from GCS (task.Input will contain the intermediate data locations)
- // 2. Perform Reduce operation (user-defined Reduce function)
- // 3. Write final output to GCS
- // ...
- return nil
-}
-
-// ... (User-defined Map and Reduce functions)
 ```
 
 ## **TODO:**
