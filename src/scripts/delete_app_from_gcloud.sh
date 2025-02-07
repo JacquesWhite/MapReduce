@@ -21,7 +21,9 @@ kubectl delete service mapreduce-master
 kubectl delete statefulset mapreduce-master
 kubectl delete service mapreduce-upload
 kubectl delete statefulset mapreduce-upload
+kubectl delete service mapreduce-upload-loadbalancer
 kubectl delete deployment mapreduce-workers
+kubectl delete hpa mapreduce-workers-autoscaler
 
 # Delete the log-based metrics (everything needs separate confirmation)
 gcloud logging metrics delete mapreduce-master-critical
