@@ -18,7 +18,7 @@ Map Reduce project for **Engineering Distributed Infrastructure** class at Unive
 - [GKE Storage](https://console.cloud.google.com/kubernetes/persistentvolumeclaims)
 - [NFS instance](https://console.cloud.google.com/filestore/instances)
 
-## Using application deployed to GEK on Google Cloud Platform
+## Using application deployed to GKE on Google Cloud Platform
 1. Use GKE feature of port forwarding to a specific pod:
     - `kubectl port-forward mapreduce-upload 8000:8000`
     - Open browser and go to `localhost:8000`
