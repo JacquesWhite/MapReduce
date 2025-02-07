@@ -2,14 +2,14 @@ package startup_utils
 
 import (
 	"context"
-	"github.com/JacquesWhite/MapReduce/worker"
-	"github.com/JacquesWhite/MapReduce/worker/worker_utils"
 	"net"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/JacquesWhite/MapReduce/worker"
+	"github.com/JacquesWhite/MapReduce/worker/worker_utils"
 	"github.com/rs/zerolog/log"
 
 	masterpb "github.com/JacquesWhite/MapReduce/proto/master"
