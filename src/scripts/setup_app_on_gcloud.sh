@@ -48,6 +48,7 @@ envsubst < ./../../k8s-deployment/master/master-statefulset.yml | kubectl apply 
 
 # GKE Worker
 envsubst < ./../../k8s-deployment/worker/worker-deployment.yml | kubectl apply -f -
+kubectl apply -f ./../../k8s-deployment/worker/worker-autoscaling.yml
 
 # GKE Upload
 envsubst < ./../../k8s-deployment/upload/upload-service.yml | kubectl apply -f -

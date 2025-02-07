@@ -1,0 +1,12 @@
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mapreduce-workers-autoscaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mapreduce-workers
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 40

@@ -347,7 +347,7 @@ func (s *Service) recheckAvailableWorkers(ctx context.Context) error {
 		}
 	}
 	if s.availableWorkers == 0 {
-	        err = status.Error(codes.Internal, "No worker available to process tasks")
+		err := status.Error(codes.Internal, "No worker available to process tasks")
 		log.Err(err).Msgf("No worker available to process tasks")
 		return err
 	}
