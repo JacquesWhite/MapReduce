@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/JacquesWhite/MapReduce/worker"
+	"github.com/JacquesWhite/MapReduce/worker/worker_utils"
 )
 
 // Some simple predefined functions for Map and Reduce
@@ -14,14 +14,14 @@ import (
 // which will be predefined by the Master.
 // (Master will divide the file and pass it to the Workers)
 
-func Map(_ string, contents string) []worker.KeyValue {
+func Map(_ string, contents string) []worker_utils.KeyValue {
 	// Split file contents into an array of words.
-	words := strings.FieldsFunc(contents, worker.IsSeparator)
+	words := strings.FieldsFunc(contents, worker_utils.IsSeparator)
 
 	// Create a KeyValue pair for each word.
-	var kva []worker.KeyValue
+	var kva []worker_utils.KeyValue
 	for _, w := range words {
-		kv := worker.KeyValue{Key: strings.ToLower(w), Value: "1"}
+		kv := worker_utils.KeyValue{Key: strings.ToLower(w), Value: "1"}
 		kva = append(kva, kv)
 	}
 
