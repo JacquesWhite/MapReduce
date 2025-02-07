@@ -50,7 +50,7 @@
 2. **Google Compute Engine (GCE):**
     * **Master Node:** Create a GCE instance to host Master node application.
     * **Worker Nodes:** Create a pool of GCE instances (GCE Managed Instance Group) for Worker nodes.
-        * Set up networking to allow communication between the GCE instances.
+    * Set up networking to allow communication between the GCE instances.
 
 3. **RPC for communication:**
     * Use Remote Procedure Calls (RPC) for communication between the Master and Worker nodes.
@@ -82,22 +82,21 @@
 +--------------------------+--------------------------+--------------------------+
 ```
 
-## **TODO:**
-<!--  -->
+## **Project plan:**
 - [x] **Set up a Google Cloud Project:** Create a project in the Google Cloud Console.
-- [x] **Enable APIs:** Enable the Compute Engine, Cloud Storage, and Pub/Sub APIs (if we choose to use it).
-- [ ] **Configure Networking:** open ports and write bash program to run by master to run things on workers.
-- [ ] **Write the Code:**
+- [x] **Enable APIs:** Enable the Compute Engine, Cloud Storage, Pub/Sub APIs, GKE (if we choose to use it).
+- [x] **Configure Networking:** open ports and write bash program to run by Master to run things on Workers.
+- [x] **Write the Code:**
     - [x] Loading Map and Reduce functions from plugins.
-    - [ ] GCS interaction for reading/writing data.
+    - [x] GCS interaction for reading/writing data (done for GKE).
     - [x] Task assignment and tracking logic in the Master.
     - [x] Task execution logic in the Workers.
     - [x] Communication between the Master and Workers using RPC.
     - [x] Error handling (also part of previous tasks).
     - [x] Task management (either in-memory or using Pub/Sub).
     - [x] Simple Map and Reduce functions for testing ([mit](https://github.com/zhou-yuhan/MIT-6.824-Distributed-Systems/tree/0c95023d5c36e08880c049d5fbb41c60d34e4299/labs/src/mrapps))
-## **Considerations:**
 
+## **Considerations:**
 * **Error Handling:** Task retries after deadline.
 * **Fault Tolerance:** Handle worker failures gracefully (e.g., the Master should reassign tasks).
 * **Intermediate Data Management:**  Efficiently partition, sort, and shuffle intermediate data between the Map and Reduce phases. Distributed file systems or in-memory data grids over GCS?

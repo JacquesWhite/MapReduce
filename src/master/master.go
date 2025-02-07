@@ -408,8 +408,8 @@ func (s *Service) monitorTaskExecution(ctx context.Context, idx int, task Runnab
 			return err
 		}
 		if !otherAvailableWorker {
-		        err = status.Errorf(codes.Internal, "All workers failed to process task")
-		        log.Err(err).Msgf("All workers failed")
+			err = status.Errorf(codes.Internal, "All workers failed to process task")
+			log.Err(err).Msgf("All workers failed")
 			return err
 		}
 	case Idle, Processing:
