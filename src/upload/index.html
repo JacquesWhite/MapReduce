@@ -1,46 +1,324 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>File Upload</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MapReduce Control Panel</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .navbar-brand { font-weight: 700; font-size: 1.5rem; }
+        .hero {
+            padding: 3rem 0;
+            text-align: center;
+            background-color: #007bff;
+            color: #fff;
+        }
+        .hero h1 { font-size: 2.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .hero p { font-size: 1.125rem; }
+        .card-header { background-color: #fff; border-bottom: 2px solid #e9ecef; }
+        .card-header h4 { margin: 0; color: #007bff; font-weight: 500; }
+        footer {
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            background-color: #fff;
+            border-top: 1px solid #e9ecef;
+            padding: 1rem 0;
+        }
+        .btn-primary { background-color: #007bff; border: none; }
+        .btn-primary:hover { background-color: #0056b3; }
+        .list-group-item-action:hover { background-color: #e9f2ff; }
+    </style>
 </head>
 <body>
-    <h1>Upload Files</h1>
-    <form action="/upload/" method="post" enctype="multipart/form-data">
-        <label for="subdirectory">Subdirectory:</label>
-        <input type="text" name="subdirectory" id="subdirectory">
-        <br><br>
-        <input type="file" name="files" multiple>
-        <input type="submit" value="Upload">
-    </form>
-    <h2>Download Subdirectories</h2>
-    <div id="file-list">
-        <!-- File list will be populated here -->
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="#">MapReduce Control Panel</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item"><a class="nav-link" href="#upload">Upload Dataset</a></li>
+                <li class="nav-item"><a class="nav-link" href="#upload-plugin">Upload Plugin</a></li>
+                <li class="nav-item"><a class="nav-link" href="#mapreduce">Run MapReduce</a></li>
+                <li class="nav-item"><a class="nav-link" href="#download">Download</a></li>
+            </ul>
+        </div>
     </div>
-    <h2>MapReduce</h2>
-    <form action="/mapreduce/" method="post">
-        <label for="mapreduce-subdirectory">Subdirectory:</label>
-        <input type="text" name="subdirectory" id="mapreduce-subdirectory">
-        <br><br>
-        <label for="num-partitions">Number of Partitions:</label>
-        <input type="number" name="num_partitions" id="num-partitions" min="1" value="1">
-        <br><br>
-        <input type="submit" value="Run MapReduce">
-    </form>
-    <script>
-        async function fetchFiles() {
-            const response = await fetch('/files');
-            const subdirectories = await response.json();
-            const fileList = document.getElementById('file-list');
-            fileList.innerHTML = '';
-            subdirectories.forEach(subdirectory => {
-                const link = document.createElement('a');
-                link.href = `/download/${subdirectory}`;
-                link.textContent = subdirectory;
-                fileList.appendChild(link);
-                fileList.appendChild(document.createElement('br'));
-            });
+</nav>
+
+<!-- Hero Section -->
+<section class="hero">
+    <div class="container">
+        <h1>MapReduce Control Panel</h1>
+        <p>Manage your datasets, plugins, and run MapReduce jobs with ease.</p>
+    </div>
+</section>
+
+<!-- Main Content -->
+<div class="container my-5">
+    <div class="row g-4">
+        <!-- Left Column: Upload & Plugin Forms -->
+        <div class="col-lg-6">
+            <!-- Dataset Upload Card -->
+            <div id="upload" class="card shadow-sm mb-4">
+                <div class="card-header"><h4>Dataset Upload</h4></div>
+                <div class="card-body">
+                    <!-- Message area for Dataset Upload -->
+                    <div id="upload-message" style="display:none;"></div>
+                    <p class="mb-4">
+                        Create a new dataset by uploading files from your system. This dataset will be used as input for MapReduce jobs.
+                    </p>
+                    <form id="upload-form" action="/upload/" method="post" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="dataset-name" class="form-label">Dataset Name</label>
+                            <!-- Note: the backend expects the field name "subdirectory" -->
+                            <input type="text" name="subdirectory" id="dataset-name" class="form-control" placeholder="Enter dataset name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="files" class="form-label">Select Files</label>
+                            <input type="file" name="files" multiple class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Upload Dataset</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Plugin Upload Card -->
+            <div id="upload-plugin" class="card shadow-sm mb-4">
+                <div class="card-header"><h4>Upload Plugin</h4></div>
+                <div class="card-body">
+                    <!-- Message area for Plugin Upload -->
+                    <div id="upload-plugin-message" style="display:none;"></div>
+                    <p class="mb-4">
+                        Upload your Go plugin containing both map and reduce functions. This plugin will be deployed to worker nodes during processing.
+                    </p>
+                    <form id="plugin-form" action="/upload_plugin/" method="post" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="plugin-file" class="form-label">Plugin File (.so)</label>
+                            <input type="file" name="file" id="plugin-file" accept=".so" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Upload Plugin</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: MapReduce & Download -->
+        <div class="col-lg-6">
+            <!-- MapReduce Card -->
+            <div id="mapreduce" class="card shadow-sm mb-4">
+                <div class="card-header"><h4>Run MapReduce Job</h4></div>
+                <div class="card-body">
+                    <!-- Message area for MapReduce -->
+                    <div id="mapreduce-message" style="display:none;"></div>
+                    <p class="mb-4">
+                        Select a dataset, specify the number of partitions, and choose a plugin to execute a MapReduce job.
+                    </p>
+                    <form id="mapreduce-form" action="/mapreduce/" method="post">
+                        <div class="mb-3">
+                            <label for="mapreduce-dataset-name" class="form-label">Dataset</label>
+                            <select name="subdirectory" id="mapreduce-dataset-name" class="form-select" required>
+                                <!-- Options will be populated via JS -->
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="num-partitions" class="form-label">Number of Partitions</label>
+                            <input type="number" name="num_partitions" id="num-partitions" min="1" value="1" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="plugin" class="form-label">Plugin</label>
+                            <select name="plugin" id="plugin-dropdown" class="form-select" required>
+                                <!-- Options will be populated via JS -->
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Run MapReduce</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Download Card -->
+            <div id="download-dataset" class="card shadow-sm mb-4">
+                <div class="card-header"><h4>Download Datasets</h4></div>
+                <div class="card-body">
+                    <p class="mb-4">
+                        Download your uploaded datasets
+                    </p>
+                    <div id="dataset-file-list" class="list-group">
+                        <!-- File list will be populated via JS -->
+                    </div>
+                </div>
+            </div>
+            <!-- Download Card -->
+            <div id="download-result" class="card shadow-sm mb-4">
+                <div class="card-header"><h4>Download Results</h4></div>
+                <div class="card-body">
+                    <p class="mb-4">
+                        Download processed outputs generated by your MapReduce jobs.
+                    </p>
+                    <div id="result-file-list" class="list-group">
+                        <!-- File list will be populated via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer>
+    <div class="container text-center">
+        <small>&copy; 2025 IRIO MapReduce Project. All rights reserved.</small>
+    </div>
+</footer>
+
+<!-- JavaScript: jQuery, Popper.js, Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
+<script>
+    // Helper function to display messages in a colored alert box.
+    function showMessage(elementId, status, message, extraHTML = "", timeout = 5000) {
+        const el = document.getElementById(elementId);
+        el.style.display = "block";
+        el.innerHTML = message + extraHTML;
+        el.className = status === "success" ? "alert alert-success" : "alert alert-danger";
+        // Hide after 5 seconds.
+        setTimeout(() => { el.style.display = "none"; }, timeout);
+    }
+
+    // Intercept the Dataset Upload form submission.
+    document.getElementById("upload-form").addEventListener("submit", async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        try {
+            const res = await fetch(this.action, { method: "POST", body: formData });
+            const result = await res.json();
+            showMessage("upload-message", result.status, result.message);
+            fetchDatasetFiles(); // refresh the dataset list
+        } catch (err) {
+            showMessage("upload-message", "error", err.toString());
         }
-        fetchFiles();
-    </script>
+    });
+
+    // Intercept the Plugin Upload form submission.
+    document.getElementById("plugin-form").addEventListener("submit", async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        try {
+            const res = await fetch(this.action, { method: "POST", body: formData });
+            const result = await res.json();
+            showMessage("upload-plugin-message", result.status, result.message);
+            fetchPlugins(); // refresh the plugin dropdown
+        } catch (err) {
+            showMessage("upload-plugin-message", "error", err.toString());
+        }
+    });
+
+    // Intercept the MapReduce form submission.
+    document.getElementById("mapreduce-form").addEventListener("submit", async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        try {
+            const res = await fetch(this.action, { method: "POST", body: formData });
+            const result = await res.json();
+            let extra = "";
+            if (result.download_url) {
+                extra = `<br/><a href="${result.download_url}" class="btn btn-link">Download Output</a>`;
+            }
+            showMessage("mapreduce-message", result.status, result.message, extra, 10000);
+            fetchDatasetFiles();
+            fetchResultFiles();
+        } catch (err) {
+            showMessage("mapreduce-message", "error", err.toString(), 10000);
+        }
+    });
+
+    // Fetch the list of available datasets and populate the file list and MapReduce select.
+    async function fetchDatasetFiles() {
+        try {
+            const res = await fetch('/files/datasets');
+            const datasets = await res.json();
+            const fileList = document.getElementById('dataset-file-list');
+            const mapreduceSelect = document.getElementById('mapreduce-dataset-name');
+            fileList.innerHTML = "";
+            mapreduceSelect.innerHTML = "";
+            datasets.forEach(dataset => {
+                // Create a download link.
+                const a = document.createElement('a');
+                a.href = `/download/datasets/${dataset}`;
+                a.className = 'list-group-item list-group-item-action';
+                a.textContent = dataset;
+                fileList.appendChild(a);
+
+                // Add the dataset as an option in the MapReduce dropdown.
+                const option = document.createElement('option');
+                option.value = dataset;
+                option.textContent = dataset;
+                mapreduceSelect.appendChild(option);
+            });
+        } catch (err) {
+            console.error("Error fetching files:", err);
+        }
+    }
+
+     // Fetch the list of available datasets and populate the file list and MapReduce select.
+    async function fetchResultFiles() {
+        try {
+            const res = await fetch('/files/results');
+            const datasets = await res.json();
+            const fileList = document.getElementById('result-file-list');
+            fileList.innerHTML = "";
+            datasets.forEach(dataset => {
+                // Create a download link.
+                const a = document.createElement('a');
+                a.href = `/download/results/${dataset}`;
+                a.className = 'list-group-item list-group-item-action';
+                a.textContent = dataset;
+                fileList.appendChild(a);
+            });
+        } catch (err) {
+            console.error("Error fetching files:", err);
+        }
+    }
+
+    // Fetch the list of plugins and populate the plugin dropdown.
+    async function fetchPlugins() {
+        try {
+            const res = await fetch('/plugins');
+            const plugins = await res.json();
+            const dropdown = document.getElementById('plugin-dropdown');
+            dropdown.innerHTML = "";
+            plugins.plugins.forEach(plugin => {
+                const option = document.createElement('option');
+                option.value = plugin;
+                option.textContent = plugin;
+                dropdown.appendChild(option);
+            });
+        } catch (err) {
+            console.error("Error fetching plugins:", err);
+        }
+    }
+
+    // Initialize data on page load.
+    fetchDatasetFiles();
+    fetchResultFiles();
+    fetchPlugins();
+</script>
 </body>
 </html>

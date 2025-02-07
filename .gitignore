@@ -13,6 +13,10 @@ src/proto/master/
 src/proto/worker/
 src/bin/
 
+src/upload/master.proto
+src/upload/master_pb2.py
+src/upload/master_pb2_grpc.py
+
 # Test binary, built with `go test -c`
 *.test
 
