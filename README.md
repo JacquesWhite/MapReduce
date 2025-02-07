@@ -1,6 +1,8 @@
 # MapReduce
 Map Reduce project for **Engineering Distributed Infrastructure** class at University of Warsaw
 
+[Link to initial project design docs.](https://docs.google.com/document/d/1o6EvaMAkIYrWLscHJIr6kQWWH1GLEId4GAzPGA88WZU/edit?usp=sharing)
+
 ## Set up application on Google Cloud Platform with Kubernetes
 
 ### Using script
@@ -10,7 +12,7 @@ Map Reduce project for **Engineering Distributed Infrastructure** class at Unive
 3. Authenticate with Google Cloud SDK
    - `gcloud auth login`
    - `gcloud config set project PROJECT_ID`
-4. Run the turnup script
+4. Run the setup script
    - `src/scripts/setup_app_on_gcloud.sh`
 
 ### Useful links
@@ -26,3 +28,4 @@ Map Reduce project for **Engineering Distributed Infrastructure** class at Unive
     - ` MapReduce is now available at: http://<Address>` - just go to that address
 3. Check the address of the service:
     - `kubectl get svc mapreduce-upload-loadbalancer -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`
+4. To check for logs go to Logging --> Log-based metrics
