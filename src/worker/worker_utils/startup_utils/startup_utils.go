@@ -8,9 +8,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/JacquesWhite/MapReduce/worker"
 	"github.com/JacquesWhite/MapReduce/worker/worker_utils"
-	"github.com/rs/zerolog/log"
 
 	masterpb "github.com/JacquesWhite/MapReduce/proto/master"
 	workerpb "github.com/JacquesWhite/MapReduce/proto/worker"
