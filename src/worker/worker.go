@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"hash/fnv"
-	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -14,6 +13,8 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/rs/zerolog/log"
 
 	workerpb "github.com/JacquesWhite/MapReduce/proto/worker"
 )
@@ -44,6 +45,7 @@ func hashIdx(key string, nParts int32) int32 {
 	h := fnv.New32a()
 	_, err := h.Write([]byte(key))
 	if err != nil {
+		log.Err(err).Msg("Error writing to hash function")
 		return 0
 	}
 	return int32(h.Sum32()&0x7fffffff) % nParts
@@ -73,10 +75,10 @@ func (w *ServiceWorker) changeStatus(status workerpb.CheckStatusResponse_Status)
 }
 
 func (w *ServiceWorker) readMapInput(intermediateDir, inputFile string) ([]byte, error) {
-	log.Println("Checking for Directory existence, if not creating it")
+	log.Info().Msg("Checking for Directory existence, if not creating it")
 	err := os.MkdirAll(intermediateDir, os.ModePerm)
 	if os.IsExist(err) {
-		log.Println("The directory named ", intermediateDir, " exists, nothing created")
+		log.Info().Msgf("The directory named %s exists, nothing created", intermediateDir)
 	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Map: error creating directory: %v", err)
@@ -134,7 +136,7 @@ func (w *ServiceWorker) readReduceInput(files []string) ([]KeyValue, error) {
 			return nil, status.Errorf(codes.Internal, "Reduce: error reading file: %v", err)
 		}
 
-		log.Println("Reading file:", file)
+		log.Info().Msgf("Reading file: %s", file)
 		scanner := bufio.NewScanner(strings.NewReader(string(content)))
 		for scanner.Scan() {
 			line := scanner.Text()
@@ -144,7 +146,7 @@ func (w *ServiceWorker) readReduceInput(files []string) ([]KeyValue, error) {
 		}
 	}
 
-	log.Println("Sorting intermediate results")
+	log.Info().Msg("Sorting intermediate results")
 	sort.Sort(ByKey(intermediate))
 
 	return intermediate, nil
@@ -175,7 +177,7 @@ func (w *ServiceWorker) processReduce(intermediate []KeyValue, outFile *os.File)
 }
 
 func (w *ServiceWorker) Map(_ context.Context, request *workerpb.MapRequest) (*workerpb.MapResponse, error) {
-	log.Println("Map request received with file:", request.GetInputFile(), "and intermediate directory:", request.GetIntermediateDir())
+	log.Info().Msgf("Map request received with file: %s and intermediate directory: %s", request.GetInputFile(), request.GetIntermediateDir())
 	w.changeStatus(workerpb.CheckStatusResponse_BUSY)
 
 	content, err := w.readMapInput(request.GetIntermediateDir(), request.GetInputFile())
@@ -183,7 +185,7 @@ func (w *ServiceWorker) Map(_ context.Context, request *workerpb.MapRequest) (*w
 		return nil, status.Errorf(codes.Internal, "Map: error reading file: %v", err)
 	}
 
-	log.Println("Invoking Map function on file contents")
+	log.Info().Msg("Invoking Map function on file contents")
 	mapRes := w.mapFunc(request.GetInputFile(), string(content))
 
 	kvAll := w.mapResultsToPartitions(mapRes, request.GetNumPartitions())
@@ -195,7 +197,7 @@ func (w *ServiceWorker) Map(_ context.Context, request *workerpb.MapRequest) (*w
 	}
 
 	w.changeStatus(workerpb.CheckStatusResponse_COMPLETED)
-	log.Println("Map finished")
+	log.Info().Msg("Map request finished")
 
 	return &workerpb.MapResponse{
 		TaskId:            request.GetTaskId(),
@@ -204,7 +206,7 @@ func (w *ServiceWorker) Map(_ context.Context, request *workerpb.MapRequest) (*w
 }
 
 func (w *ServiceWorker) Reduce(_ context.Context, request *workerpb.ReduceRequest) (*workerpb.ReduceResponse, error) {
-	log.Println("Reduce request received with output file:", request.GetOutputFile())
+	log.Info().Msgf("Reduce request received with output file: %s", request.GetOutputFile())
 	w.changeStatus(workerpb.CheckStatusResponse_BUSY)
 
 	// Read all files with intermediate output from Maps
@@ -213,7 +215,7 @@ func (w *ServiceWorker) Reduce(_ context.Context, request *workerpb.ReduceReques
 		return nil, status.Errorf(codes.Internal, "Reduce: error reading intermediate files: %v", err)
 	}
 
-	log.Println("Create the output file (if exists, truncate it)")
+	log.Info().Msg("Create the output file (if exists, truncate it)")
 	outFile, err := os.Create(request.GetOutputFile())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Reduce: error creating output file: %v", err)
@@ -223,7 +225,7 @@ func (w *ServiceWorker) Reduce(_ context.Context, request *workerpb.ReduceReques
 	err = w.processReduce(intermediate, outFile)
 
 	w.changeStatus(workerpb.CheckStatusResponse_COMPLETED)
-	log.Println("Reduce request finished")
+	log.Info().Msg("Reduce request finished")
 
 	return &workerpb.ReduceResponse{
 		TaskId: request.GetTaskId(),
@@ -231,17 +233,17 @@ func (w *ServiceWorker) Reduce(_ context.Context, request *workerpb.ReduceReques
 }
 
 func (w *ServiceWorker) CheckStatus(_ context.Context, _ *workerpb.CheckStatusRequest) (*workerpb.CheckStatusResponse, error) {
-	log.Println("CheckStatus request received")
+	log.Info().Msg("CheckStatus request received")
 
 	w.statusMx.Lock()
 	workerStatus := w.status
-	log.Printf("Worker status: %v\n", workerStatus)
+	log.Info().Msgf("Worker status: %v", workerStatus)
 	// Masters collects the status, so we can reset it to IDLE
 	if workerStatus == workerpb.CheckStatusResponse_COMPLETED {
 		w.status = workerpb.CheckStatusResponse_IDLE
 	}
 	w.statusMx.Unlock()
-	log.Println("CheckStatus request finished")
+	log.Info().Msg("CheckStatus request finished")
 
 	return &workerpb.CheckStatusResponse{Status: workerStatus}, nil
 }

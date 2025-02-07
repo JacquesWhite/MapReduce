@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: upload
-          image: $REGION-docker.pkg.dev/mapreduce-449700/map-reduce/upload:latest
+          image: ${REGION}-docker.pkg.dev/${PROJECT_ID}/map-reduce/upload:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
