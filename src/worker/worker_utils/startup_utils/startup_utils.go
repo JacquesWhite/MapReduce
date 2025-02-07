@@ -1,14 +1,15 @@
-package worker_startup
+package startup_utils
 
 import (
 	"context"
+	"github.com/JacquesWhite/MapReduce/worker"
+	"github.com/JacquesWhite/MapReduce/worker/worker_utils"
 	"net"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/JacquesWhite/MapReduce/worker"
 	"github.com/rs/zerolog/log"
 
 	masterpb "github.com/JacquesWhite/MapReduce/proto/master"
@@ -20,8 +21,8 @@ type ContextWorker struct {
 	MasterPort string
 	WorkerIP   string
 	WorkerPort string
-	MapFunc    worker.MapFuncT
-	ReduceFunc worker.ReduceFuncT
+	MapFunc    worker_utils.MapFuncT
+	ReduceFunc worker_utils.ReduceFuncT
 }
 
 func StartWorkerServer(ctx ContextWorker) {

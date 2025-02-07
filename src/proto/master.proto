@@ -24,6 +24,7 @@ message MapReduceRequest {
   string input_dir = 1;
   string working_dir = 2;
   int32 num_partitions = 3;
+  string plugin_path = 4;
 }
 
 message MapReduceResponse {

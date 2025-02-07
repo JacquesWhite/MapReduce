@@ -3,68 +3,36 @@ package worker
 import (
 	"bufio"
 	"context"
-	"hash/fnv"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"unicode"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/JacquesWhite/MapReduce/worker/worker_utils"
+
 	workerpb "github.com/JacquesWhite/MapReduce/proto/worker"
 )
-
-type KeyValue struct {
-	// Key - what are we mapping
-	Key string
-	// Value - to what are we mapping to
-	Value string
-}
-
-type MapFuncT = func(string, string) []KeyValue
-type ReduceFuncT = func(string, []string) string
-
-// ByKey Sorting interface for KeyValue intermediate output.
-type ByKey []KeyValue
-
-func (a ByKey) Len() int           { return len(a) }
-func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
-
-func IsSeparator(char int32) bool {
-	return !unicode.IsLetter(char) && !(char == '-')
-}
-
-func hashIdx(key string, nParts int32) int32 {
-	// Function to choose the bucket number in which the KeyValue will be emitted.
-	h := fnv.New32a()
-	_, err := h.Write([]byte(key))
-	if err != nil {
-		log.Err(err).Msg("Error writing to hash function")
-		return 0
-	}
-	return int32(h.Sum32()&0x7fffffff) % nParts
-}
 
 type ServiceWorker struct {
 	workerpb.UnimplementedWorkerServer
 
-	mapFunc    MapFuncT
-	reduceFunc ReduceFuncT
-	statusMx   sync.Mutex
-	status     workerpb.CheckStatusResponse_Status
+	defaultMapFunc    worker_utils.MapFuncT
+	defaultReduceFunc worker_utils.ReduceFuncT
+	statusMx          sync.Mutex
+	status            workerpb.CheckStatusResponse_Status
 }
 
-func NewWorkerService(m MapFuncT, r ReduceFuncT) *ServiceWorker {
+func NewWorkerService(m worker_utils.MapFuncT, r worker_utils.ReduceFuncT) *ServiceWorker {
 	return &ServiceWorker{
-		mapFunc:    m,
-		reduceFunc: r,
-		status:     workerpb.CheckStatusResponse_IDLE,
+		defaultMapFunc:    m,
+		defaultReduceFunc: r,
+		status:            workerpb.CheckStatusResponse_IDLE,
 	}
 }
 
@@ -91,19 +59,19 @@ func (w *ServiceWorker) readMapInput(intermediateDir, inputFile string) ([]byte,
 	return content, nil
 }
 
-func (w *ServiceWorker) mapResultsToPartitions(mapRes []KeyValue, nPartitions int32) [][]KeyValue {
-	kvAll := make([][]KeyValue, nPartitions)
+func (w *ServiceWorker) mapResultsToPartitions(mapRes []worker_utils.KeyValue, nPartitions int32) [][]worker_utils.KeyValue {
+	kvAll := make([][]worker_utils.KeyValue, nPartitions)
 
 	// Map the results to the partitions (Map mapFunction results into nPartitions buckets)
 	for _, kv := range mapRes {
-		idx := hashIdx(kv.Key, nPartitions)
+		idx := worker_utils.HashIdx(kv.Key, nPartitions)
 		kvAll[idx] = append(kvAll[idx], kv)
 	}
 
 	return kvAll
 }
 
-func (w *ServiceWorker) saveMapOutput(kvAll [][]KeyValue, intermediateDir string) ([]string, error) {
+func (w *ServiceWorker) saveMapOutput(kvAll [][]worker_utils.KeyValue, intermediateDir string) ([]string, error) {
 	partitions := make([]string, len(kvAll))
 	for i, kvs := range kvAll {
 		filepath := intermediateDir + "/intermediate-" + strconv.Itoa(i)
@@ -128,8 +96,8 @@ func (w *ServiceWorker) saveMapOutput(kvAll [][]KeyValue, intermediateDir string
 	return partitions, nil
 }
 
-func (w *ServiceWorker) readReduceInput(files []string) ([]KeyValue, error) {
-	var intermediate []KeyValue
+func (w *ServiceWorker) readReduceInput(files []string) ([]worker_utils.KeyValue, error) {
+	var intermediate []worker_utils.KeyValue
 	for _, file := range files {
 		content, err := os.ReadFile(file)
 		if err != nil {
@@ -141,18 +109,36 @@ func (w *ServiceWorker) readReduceInput(files []string) ([]KeyValue, error) {
 		for scanner.Scan() {
 			line := scanner.Text()
 			parts := strings.Split(line, " ")
-			kv := KeyValue{Key: parts[0], Value: parts[1]}
+			kv := worker_utils.KeyValue{Key: parts[0], Value: parts[1]}
 			intermediate = append(intermediate, kv)
 		}
 	}
 
 	log.Info().Msg("Sorting intermediate results")
-	sort.Sort(ByKey(intermediate))
+	sort.Sort(worker_utils.ByKey(intermediate))
 
 	return intermediate, nil
 }
 
-func (w *ServiceWorker) processReduce(intermediate []KeyValue, outFile *os.File) error {
+func (w *ServiceWorker) chooseReduceFunc(pluginFilePath string) worker_utils.ReduceFuncT {
+	_, reduceFunc, err := worker_utils.LoadPlugin(pluginFilePath)
+	if err == nil {
+		log.Info().Msg("Using Reduce function from request")
+		return reduceFunc
+	}
+	return w.defaultReduceFunc
+}
+
+func (w *ServiceWorker) chooseMapFunc(pluginFilePath string) worker_utils.MapFuncT {
+	mapFunc, _, err := worker_utils.LoadPlugin(pluginFilePath)
+	if err == nil {
+		log.Info().Msg("Using Map function from request")
+		return mapFunc
+	}
+	return w.defaultMapFunc
+}
+
+func (w *ServiceWorker) processReduce(intermediate []worker_utils.KeyValue, outFile *os.File, pluginFilePath string) error {
 	i := 0
 	for i < len(intermediate) {
 		j := i + 1
@@ -165,7 +151,7 @@ func (w *ServiceWorker) processReduce(intermediate []KeyValue, outFile *os.File)
 			values = append(values, intermediate[k].Value)
 		}
 
-		output := w.reduceFunc(intermediate[i].Key, values)
+		output := w.chooseReduceFunc(pluginFilePath)(intermediate[i].Key, values)
 		_, err := outFile.WriteString(intermediate[i].Key + " " + output + "\n")
 		if err != nil {
 			return status.Errorf(codes.Internal, "Reduce: error writing to output file: %v", err)
@@ -186,7 +172,7 @@ func (w *ServiceWorker) Map(_ context.Context, request *workerpb.MapRequest) (*w
 	}
 
 	log.Info().Msg("Invoking Map function on file contents")
-	mapRes := w.mapFunc(request.GetInputFile(), string(content))
+	mapRes := w.chooseMapFunc(request.GetPluginPath())(request.GetInputFile(), string(content))
 
 	kvAll := w.mapResultsToPartitions(mapRes, request.GetNumPartitions())
 
@@ -222,7 +208,7 @@ func (w *ServiceWorker) Reduce(_ context.Context, request *workerpb.ReduceReques
 	}
 
 	// Reduce the values with the same key and write them to the output file
-	err = w.processReduce(intermediate, outFile)
+	err = w.processReduce(intermediate, outFile, request.GetPluginPath())
 
 	w.changeStatus(workerpb.CheckStatusResponse_COMPLETED)
 	log.Info().Msg("Reduce request finished")

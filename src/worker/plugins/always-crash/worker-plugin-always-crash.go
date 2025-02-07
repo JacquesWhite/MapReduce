@@ -5,12 +5,12 @@ package main
 import (
 	"os"
 
-	"github.com/JacquesWhite/MapReduce/worker"
+	"github.com/JacquesWhite/MapReduce/worker/worker_utils"
 )
 
-func Map(_ string, _ string) []worker.KeyValue {
+func Map(_ string, _ string) []worker_utils.KeyValue {
 	os.Exit(1)
-	return []worker.KeyValue{}
+	return []worker_utils.KeyValue{}
 }
 
 func Reduce(_ string, _ []string) string {

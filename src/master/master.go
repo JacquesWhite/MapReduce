@@ -62,17 +62,19 @@ type mapTask struct {
 	worker          *workerpb.WorkerClient
 	inputFile       string
 	intermediateDir string
+	pluginFilepath  string
 	state           TaskState
 	mx              sync.Mutex
 }
 
 type reduceTask struct {
-	id         int
-	worker     *workerpb.WorkerClient
-	inputFiles []string
-	outputFile string
-	state      TaskState
-	mx         sync.Mutex
+	id             int
+	worker         *workerpb.WorkerClient
+	inputFiles     []string
+	outputFile     string
+	pluginFilepath string
+	state          TaskState
+	mx             sync.Mutex
 }
 
 type RunnableTask interface {
@@ -92,6 +94,7 @@ type Service struct {
 	inputDir              string
 	intermediateDir       string
 	outputDir             string
+	pluginFilePath        string
 	mapTaskToProcess      int
 	unprocessedMapResults int
 	mapTasks              []*mapTask
@@ -168,6 +171,7 @@ func (s *Service) createMapTasks() error {
 			inputFile:       s.inputDir + "/" + file.Name(),
 			intermediateDir: taskDir,
 			state:           NotAssigned,
+			pluginFilepath:  s.pluginFilePath,
 		})
 		log.Info().Msgf("Created map task: %v", s.mapTasks[i])
 	}
@@ -230,11 +234,12 @@ func (s *Service) createReduceTasks() error {
 	log.Info().Msg("Prepared reduce input files")
 	for i := 0; i < int(s.numberOfPartitions); i++ {
 		s.reduceTasks = append(s.reduceTasks, &reduceTask{
-			id:         i,
-			worker:     nil,
-			inputFiles: inputFiles[i],
-			outputFile: fmt.Sprintf("%s/%d", s.outputDir, i),
-			state:      NotAssigned,
+			id:             i,
+			worker:         nil,
+			inputFiles:     inputFiles[i],
+			outputFile:     fmt.Sprintf("%s/%d", s.outputDir, i),
+			state:          NotAssigned,
+			pluginFilepath: s.pluginFilePath,
 		})
 		log.Info().Msgf("Created reduce task: %v", s.reduceTasks[i])
 	}
@@ -255,6 +260,7 @@ func (t *reduceTask) RunTask(ctx context.Context, worker *workerpb.WorkerClient,
 			IntermediateFiles: inputFiles,
 			OutputFile:        outputFile,
 			TaskId:            int32(t.id),
+			PluginPath:        t.pluginFilepath,
 		})
 		if err != nil {
 			log.Err(err).Msgf("ROUTINE: Error while processing reduce task: %v", err)
@@ -277,6 +283,7 @@ func (t *mapTask) RunTask(ctx context.Context, worker *workerpb.WorkerClient, se
 			IntermediateDir: intermediateDir,
 			NumPartitions:   service.numberOfPartitions,
 			TaskId:          int32(t.id),
+			PluginPath:      t.pluginFilepath,
 		})
 		if err != nil {
 			log.Err(err).Msgf("ROUTINE: Error while processing map task: %v", err)
@@ -462,6 +469,7 @@ func (s *Service) initializeMapReduce(req *masterpb.MapReduceRequest) error {
 	s.intermediateDir = req.GetWorkingDir() + intermediateDirName
 	s.outputDir = req.GetWorkingDir() + outputDirName
 	s.reduceResults = make(chan *workerpb.ReduceResponse, s.numberOfPartitions)
+	s.pluginFilePath = req.GetPluginPath()
 	return nil
 }
 
