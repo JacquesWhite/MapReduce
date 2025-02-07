@@ -347,7 +347,7 @@ func (s *Service) recheckAvailableWorkers(ctx context.Context) error {
 		}
 	}
 	if s.availableWorkers == 0 {
-	        err = status.Error(codes.Internal, "No worker available to process tasks")
+		err := status.Error(codes.Internal, "No worker available to process tasks")
 		log.Err(err).Msgf("No worker available to process tasks")
 		return err
 	}
@@ -408,8 +408,8 @@ func (s *Service) monitorTaskExecution(ctx context.Context, idx int, task Runnab
 			return err
 		}
 		if !otherAvailableWorker {
-		        err = status.Errorf(codes.Internal, "All workers failed to process task")
-		        log.Err(err).Msgf("All workers failed")
+			err = status.Errorf(codes.Internal, "All workers failed to process task")
+			log.Err(err).Msgf("All workers failed")
 			return err
 		}
 	case Idle, Processing:
