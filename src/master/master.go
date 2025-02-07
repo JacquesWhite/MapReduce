@@ -83,13 +83,17 @@ type RunnableTask interface {
 	ChangeState(state TaskState)
 	CheckWorker() *workerpb.WorkerClient
 	CheckId() int
+	CreateCopy(s *Service, idx int) error
 }
 
 type Service struct {
 	masterpb.UnimplementedMasterServer
 
-	numberOfPartitions    int32
-	workers               map[*workerpb.WorkerClient]bool
+	numberOfPartitions int32
+	// Guarded by mr
+	workers map[*workerpb.WorkerClient]bool
+	// Guarded by mr
+	availableWorkers      int32
 	registeredAddress     map[string]bool
 	inputDir              string
 	intermediateDir       string
@@ -137,6 +141,24 @@ func (t *mapTask) CheckId() int {
 
 func (t *reduceTask) CheckId() int {
 	return t.id
+}
+
+func (t *mapTask) CreateCopy(s *Service, idx int) error {
+	err := s.createMapTaskCopy(idx)
+	if err != nil {
+		log.Err(err).Msgf("Monitor map task execution error while creating map task copy: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (t *reduceTask) CreateCopy(s *Service, idx int) error {
+	err := s.createReduceTaskCopy(idx)
+	if err != nil {
+		log.Err(err).Msgf("Monitor map task execution error while creating reduce task copy: %v", err)
+		return err
+	}
+	return nil
 }
 
 func logLineSeparator() {
@@ -311,6 +333,26 @@ func checkWorkerStatus(ctx context.Context, worker *workerpb.WorkerClient, taskI
 	return Failure
 }
 
+func (s *Service) recheckAvailableWorkers(ctx context.Context) error {
+	s.mx.Lock()
+	s.availableWorkers = 0
+	defer s.mx.Unlock()
+	for worker := range s.workers {
+		workerStatus := checkWorkerStatus(ctx, worker, -1)
+		if workerStatus == Failure || workerStatus == Processing {
+			s.workers[worker] = false
+		} else {
+			s.workers[worker] = true
+			s.availableWorkers++
+		}
+	}
+	if s.availableWorkers == 0 {
+		log.Err(status.Error(codes.Internal, "No worker available to process tasks")).Msgf("No worker available to process tasks")
+		return status.Errorf(codes.Internal, "No worker available to process tasks")
+	}
+	return nil
+}
+
 func (s *Service) createMapTaskCopy(idx int) error {
 	task := s.mapTasks[idx]
 	newId := len(s.mapTasks)
@@ -352,19 +394,20 @@ func (s *Service) monitorTaskExecution(ctx context.Context, idx int, task Runnab
 	case Failure:
 		// Worker is not processing the task - reassign the task
 		task.ChangeState(Invalid)
-		switch task.(type) {
-		case *mapTask:
-			err := s.createMapTaskCopy(idx)
-			if err != nil {
-				log.Err(err).Msgf("Monitor map task execution error while creating map task copy: %v", err)
-				return err
-			}
-		case *reduceTask:
-			err := s.createReduceTaskCopy(idx)
-			if err != nil {
-				log.Err(err).Msgf("Monitor map task execution error while creating reduce task copy: %v", err)
-				return err
-			}
+		otherAvailableWorker := false
+		s.mx.Lock()
+		s.availableWorkers--
+		if s.availableWorkers > 0 {
+			otherAvailableWorker = true
+		}
+		s.mx.Unlock()
+		err := task.CreateCopy(s, idx)
+		if err != nil {
+			log.Err(err).Msgf("Monitor task execution error while creating task copy: %v", err)
+			return err
+		}
+		if !otherAvailableWorker {
+			return status.Errorf(codes.Internal, "All workers failed to process task")
 		}
 	case Idle, Processing:
 		//	Worker is processing the task - come back later
@@ -440,7 +483,8 @@ func (s *Service) processMapTasks(ctx context.Context) error {
 
 func NewService() *Service {
 	return &Service{
-		workers: make(map[*workerpb.WorkerClient]bool),
+		workers:           make(map[*workerpb.WorkerClient]bool),
+		registeredAddress: make(map[string]bool),
 	}
 }
 
@@ -478,6 +522,7 @@ func (s *Service) RegisterWorker(ctx context.Context, req *masterpb.RegisterWork
 	address := req.GetWorkerAddress().GetIp() + ":" + req.GetWorkerAddress().GetPort()
 	s.mx.Lock()
 	addressAlreadyExists := s.registeredAddress[address]
+	s.registeredAddress[address] = true
 	s.mx.Unlock()
 	if addressAlreadyExists {
 		log.Info().Msgf("Worker already registered, no need to create new connection: %v", req.GetWorkerAddress())
@@ -497,6 +542,7 @@ func (s *Service) RegisterWorker(ctx context.Context, req *masterpb.RegisterWork
 
 	s.mx.Lock()
 	s.workers[&workerClient] = true
+	s.availableWorkers++
 	s.mx.Unlock()
 	log.Info().Msgf("Registered successfully worker: %v", req.GetWorkerAddress())
 	return &masterpb.RegisterWorkerResponse{}, nil
@@ -507,38 +553,57 @@ func (s *Service) MapReduce(ctx context.Context, req *masterpb.MapReduceRequest)
 	s.mr.Lock()
 	defer s.mr.Unlock()
 	logLineSeparator()
-	err := s.initializeMapReduce(req)
+	err := s.recheckAvailableWorkers(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Map reduce: failed to initialize map reduce: %v", err)
+		err = status.Errorf(codes.Internal, "Map reduce: failed to recheck available workers: %v", err)
+		log.Err(err).Msg("MapReduce request failed")
+		return nil, err
+	}
+
+	err = s.initializeMapReduce(req)
+	if err != nil {
+		err = status.Errorf(codes.Internal, "Map reduce: failed to initialize map reduce: %v", err)
+		log.Err(err).Msg("MapReduce request failed")
+		return nil, err
 	}
 
 	logLineSeparator()
 	err = s.createMapTasks()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Map reduce: failed to create map tasks: %v", err)
+		err = status.Errorf(codes.Internal, "Map reduce: failed to create map tasks: %v", err)
+		log.Err(err).Msg("MapReduce request failed")
+		return nil, err
 	}
 	logLineSeparator()
 	err = s.processMapTasks(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Map reduce: failed to process map tasks: %v", err)
+		err = status.Errorf(codes.Internal, "Map reduce: failed to process map tasks: %v", err)
+		log.Err(err).Msg("MapReduce request failed")
+		return nil, err
 	}
 
 	logLineSeparator()
 	err = s.createReduceTasks()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Map reduce: failed to create reduce tasks: %v", err)
+		err = status.Errorf(codes.Internal, "Map reduce: failed to create reduce tasks: %v", err)
+		log.Err(err).Msg("MapReduce request failed")
+		return nil, err
 	}
 
 	logLineSeparator()
 	err = s.processReduceTasks(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Map reduce: failed to process reduce tasks: %v", err)
+		err = status.Errorf(codes.Internal, "Map reduce: failed to process reduce tasks: %v", err)
+		log.Err(err).Msg("MapReduce request failed")
+		return nil, err
 	}
 
 	logLineSeparator()
 	res, err := s.prepareResponse()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Map reduce: failed to prepare response: %v", err)
+		err = status.Errorf(codes.Internal, "Map reduce: failed to prepare response: %v", err)
+		log.Err(err).Msg("MapReduce request failed")
+		return nil, err
 	}
 
 	logLineSeparator()
