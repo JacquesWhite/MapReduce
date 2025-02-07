@@ -26,6 +26,8 @@ spec:
               value: "50000"
             - name: SHARED_DIR
               value: "/mapreduce/data"
+            - name: PLUGIN_DIR
+              value: "/mapreduce/plugins"
           volumeMounts:
             - name: mapreduce-pvc
               mountPath: /mapreduce

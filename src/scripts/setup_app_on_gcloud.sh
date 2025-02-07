@@ -37,15 +37,36 @@ export FILESTORE_IP=$(
 # Optional step, if you want to update the Docker images used by pods
 ./docker_upload.sh
 
-# GKE stuff
+# GKE Storage
 kubectl create -f ./../../k8s-deployment/storage/filestore-storageclass.yml
 kubectl create -f ./../../k8s-deployment/storage/pvc.yml
 envsubst < ./../../k8s-deployment/storage/pv.yml | kubectl apply -f -
 
-envsubst < ./../../k8s-deployment/master-service.yml | kubectl apply -f -
-envsubst < ./../../k8s-deployment/master-statefulset.yml | kubectl apply -f -
-envsubst < ./../../k8s-deployment/worker-deployment.yml | kubectl apply -f -
-envsubst < ./../../k8s-deployment/upload-service.yml | kubectl apply -f -
-envsubst < ./../../k8s-deployment/upload-statefulset.yml | kubectl apply -f -
+# GKE Master
+envsubst < ./../../k8s-deployment/master/master-service.yml | kubectl apply -f -
+envsubst < ./../../k8s-deployment/master/master-statefulset.yml | kubectl apply -f -
+
+# GKE Worker
+envsubst < ./../../k8s-deployment/worker/worker-deployment.yml | kubectl apply -f -
+
+# GKE Upload
+envsubst < ./../../k8s-deployment/upload/upload-service.yml | kubectl apply -f -
+envsubst < ./../../k8s-deployment/upload/upload-statefulset.yml | kubectl apply -f -
+envsubst < ./../../k8s-deployment/upload/upload-loadbalancer.yml | kubectl apply -f -
+
+# Get the external IP of the LoadBalancer
+MAP_REDUCE_IP=""
+while [ -z "$MAP_REDUCE_IP" ]; do
+  echo "Waiting for the app to be ready..."
+  MAP_REDUCE_IP=$(kubectl get svc mapreduce-upload-loadbalancer -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  [ -z "$MAP_REDUCE_IP" ] && sleep 10
+done
+
+echo
+echo "###############################################################"
+echo "##                                                           ##"
+echo "##   MapReduce is now available at: http://$MAP_REDUCE_IP     ##"
+echo "##                                                           ##"
+echo "###############################################################"
 
 cd $current_dir || exit
